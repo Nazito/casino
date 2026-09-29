@@ -1,0 +1,22 @@
+:host {
+  display: block;
+}
+
+.shell {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+nav {
+  display: flex;
+  gap: 16px;
+}

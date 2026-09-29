@@ -1,0 +1,16 @@
+{
+  "name": "social-casino",
+  "private": true,
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev --prefix server\" \"npm start --prefix client\"",
+    "dev:api": "npm run dev --prefix server",
+    "dev:web": "npm start --prefix client",
+    "build": "npm run build --prefix client && npm run build --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

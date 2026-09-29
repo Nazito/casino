@@ -1,0 +1,14 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #12141a;
+  color: #f3f4f6;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #f5c16c;
+}

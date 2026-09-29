@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /play
+
+Sitemap: http://localhost:4200/sitemap.xml
