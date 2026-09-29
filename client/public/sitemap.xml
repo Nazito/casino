@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>http://localhost:4200/</loc></url>
-  <url><loc>http://localhost:4200/games</loc></url>
-  <url><loc>http://localhost:4200/games/neon-fruits</loc></url>
-  <url><loc>http://localhost:4200/rules</loc></url>
+  <url><loc>http://localhost:4217/</loc></url>
+  <url><loc>http://localhost:4217/games</loc></url>
+  <url><loc>http://localhost:4217/games/neon-fruits</loc></url>
+  <url><loc>http://localhost:4217/rules</loc></url>
 </urlset>

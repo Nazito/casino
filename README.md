@@ -14,7 +14,7 @@ cp server/.env.example server/.env
 npm run dev
 ```
 
-Сайт: http://localhost:4200  
-API: http://localhost:3000/api/health
+Сайт: http://localhost:4217  
+API: http://localhost:3017/api/health
 
 Без `MONGODB_URI` API поднимается, а маршруты кошелька отвечают 503.
