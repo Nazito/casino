@@ -17,4 +17,4 @@ npm run dev
 Сайт: http://localhost:4217  
 API: http://localhost:3017/api/health
 
-Без `MONGODB_URI` API поднимается, а маршруты кошелька отвечают 503.
+В `server/.env` нужна строка удалённого кластера MongoDB, не локальный `mongod`. Без `MONGODB_URI` API поднимается, а вход и спин отвечают 503.

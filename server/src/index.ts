@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
@@ -8,7 +9,8 @@ const app = express();
 const port = Number(process.env['PORT'] ?? 3017);
 const clientOrigin = process.env['CLIENT_ORIGIN'] ?? 'http://localhost:4217';
 
-app.use(cors({ origin: clientOrigin }));
+app.use(cors({ origin: clientOrigin, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 app.use('/api', api);
 

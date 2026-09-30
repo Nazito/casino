@@ -1,0 +1,88 @@
+@if (game) {
+  <h1>{{ game.title }}</h1>
+
+  @if (!ready()) {
+    <p>Загрузка…</p>
+  } @else if (!player()) {
+    <div class="modes">
+      <button type="button" [class.active]="mode() === 'login'" (click)="switchMode('login')">Вход</button>
+      <button type="button" [class.active]="mode() === 'register'" (click)="switchMode('register')">
+        Регистрация
+      </button>
+    </div>
+    <form (submit)="submitAuth($event)">
+      <p>Аккаунт для игры на развлекательные коины. Денег и вывода здесь нет.</p>
+      <label>
+        Логин
+        <input
+          name="username"
+          autocomplete="username"
+          minlength="3"
+          maxlength="24"
+          required
+          [disabled]="busy()"
+        />
+      </label>
+      <label>
+        Пароль
+        <input
+          name="password"
+          type="password"
+          [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
+          minlength="8"
+          maxlength="128"
+          required
+          [disabled]="busy()"
+        />
+      </label>
+      <button type="submit" [disabled]="busy()">
+        {{ mode() === 'register' ? 'Создать аккаунт' : 'Войти' }}
+      </button>
+    </form>
+    @if (mode() === 'register') {
+      <p class="hint">Логин 3–24 символа: буквы, цифры, «_» и «-». Пароль от 8 символов.</p>
+    }
+  } @else {
+    <p class="balance">
+      {{ player()!.displayName }} · {{ player()!.balance }} коинов
+      <button type="button" class="link" (click)="logout()" [disabled]="busy()">Выйти</button>
+    </p>
+    <div class="reels" [class.spinning]="spinning()">
+      @for (reel of reels(); track $index) {
+        <div class="reel">{{ label(reel) }}</div>
+      }
+    </div>
+    <p class="outcome">{{ outcome() }}</p>
+    <div class="stakes">
+      @for (stake of stakes; track stake) {
+        <button type="button" [class.active]="selectedStake() === stake" (click)="selectedStake.set(stake)">
+          {{ stake }}
+        </button>
+      }
+    </div>
+    <button type="button" (click)="spin()" [disabled]="spinning() || player()!.balance < selectedStake()">
+      Крутить
+    </button>
+    @if (player()!.dailyAvailable) {
+      <button type="button" (click)="claimDaily()" [disabled]="busy()">Забрать 2000 коинов</button>
+    } @else if (player()!.balance < 10) {
+      <p>Дневные коины уже забраны. Следующие будут завтра.</p>
+    }
+    @if (player()!.spins.length) {
+      <h2>Последние спины</h2>
+      <ul class="history">
+        @for (spin of player()!.spins.slice(0, 8); track $index) {
+          <li>{{ line(spin.reels) }} · ставка {{ spin.stake }} · выигрыш {{ spin.win }}</li>
+        }
+      </ul>
+    }
+  }
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+} @else {
+  <h1>Игра не найдена</h1>
+}
+
+<a routerLink="/games">К списку игр</a>
