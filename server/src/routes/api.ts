@@ -80,6 +80,7 @@ api.post('/auth/register', async (req, res) => {
     throw error;
   }
 
+  await clearLoginFailures(key);
   await startSession(res, user._id.toString());
   res.status(201).json(publicUser(user));
 });
@@ -115,7 +116,12 @@ api.post('/auth/login', async (req, res) => {
     await burnPasswordCheck(password);
   }
 
-  if (!user || !matches) {
+  if (!user) {
+    res.status(401).json({ error: 'invalid_credentials' });
+    return;
+  }
+
+  if (!matches) {
     await recordLoginFailure(key);
     res.status(401).json({ error: 'invalid_credentials' });
     return;

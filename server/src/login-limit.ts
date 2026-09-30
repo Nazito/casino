@@ -11,6 +11,7 @@ const authLimitSchema = new mongoose.Schema({
   windowEndsAt: { type: Date, required: true },
   lockedUntil: { type: Date, default: null },
   expiresAt: { type: Date, required: true },
+  accepted: { type: Boolean, required: true },
 });
 
 authLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -40,45 +41,78 @@ export async function clearLoginFailures(login: string): Promise<void> {
 
 async function consume(key: string, max: number, lockOnMax: boolean): Promise<'ok' | 'locked'> {
   const now = new Date();
-  const existing = await AuthLimit.findOne({ key });
-  if (existing?.lockedUntil && existing.lockedUntil > now) {
-    return 'locked';
-  }
+  const nextWindow = new Date(now.getTime() + WINDOW_MS);
+  const locked = { $gt: [{ $ifNull: ['$lockedUntil', new Date(0)] }, now] };
+  const expired = { $lte: [{ $ifNull: ['$windowEndsAt', new Date(0)] }, now] };
 
-  const inWindow = !!existing && existing.windowEndsAt > now;
-  if (!inWindow) {
-    const windowEndsAt = new Date(now.getTime() + WINDOW_MS);
-    await AuthLimit.findOneAndUpdate(
-      { key },
-      { $set: { count: 1, windowEndsAt, lockedUntil: null, expiresAt: windowEndsAt } },
-      { upsert: true },
-    );
-    if (max <= 1 && lockOnMax) {
-      await lockUntilNextWindow(key);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const updated = await AuthLimit.findOneAndUpdate(
+        { key },
+        [
+          {
+            $set: {
+              accepted: {
+                $cond: [locked, false, { $cond: [expired, true, { $lt: [{ $ifNull: ['$count', 0] }, max] }] }],
+              },
+            },
+          },
+          {
+            $set: {
+              count: {
+                $cond: [
+                  '$accepted',
+                  { $cond: [expired, 1, { $add: [{ $ifNull: ['$count', 0] }, 1] }] },
+                  { $ifNull: ['$count', 0] },
+                ],
+              },
+              windowEndsAt: {
+                $cond: [{ $and: ['$accepted', expired] }, nextWindow, { $ifNull: ['$windowEndsAt', nextWindow] }],
+              },
+              expiresAt: {
+                $cond: [{ $and: ['$accepted', expired] }, nextWindow, { $ifNull: ['$expiresAt', nextWindow] }],
+              },
+              lockedUntil: {
+                $cond: [locked, '$lockedUntil', null],
+              },
+            },
+          },
+          {
+            $set: {
+              lockedUntil: {
+                $cond: [{ $and: [lockOnMax, '$accepted', { $gte: ['$count', max] }] }, nextWindow, '$lockedUntil'],
+              },
+              windowEndsAt: {
+                $cond: [{ $and: [lockOnMax, '$accepted', { $gte: ['$count', max] }] }, nextWindow, '$windowEndsAt'],
+              },
+              expiresAt: {
+                $cond: [{ $and: [lockOnMax, '$accepted', { $gte: ['$count', max] }] }, nextWindow, '$expiresAt'],
+              },
+            },
+          },
+        ],
+        { upsert: true, new: true },
+      );
+      if (!updated?.accepted || updated.count > max) {
+        return 'locked';
+      }
+      return 'ok';
+    } catch (error) {
+      if (isDuplicate(error) && attempt < 2) {
+        continue;
+      }
+      if (isDuplicate(error)) {
+        return 'locked';
+      }
+      throw error;
     }
-    return 'ok';
   }
 
-  if (existing.count >= max) {
-    if (lockOnMax) {
-      await lockUntilNextWindow(key);
-    }
-    return 'locked';
-  }
-
-  const updated = await AuthLimit.findOneAndUpdate({ key }, { $inc: { count: 1 } }, { new: true });
-  if (updated && updated.count >= max && lockOnMax) {
-    await lockUntilNextWindow(key);
-  }
-  return updated && updated.count > max ? 'locked' : 'ok';
+  return 'locked';
 }
 
-async function lockUntilNextWindow(key: string): Promise<void> {
-  const lockedUntil = new Date(Date.now() + WINDOW_MS);
-  await AuthLimit.updateOne(
-    { key },
-    { $set: { lockedUntil, windowEndsAt: lockedUntil, expiresAt: lockedUntil } },
-  );
+function isDuplicate(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
 }
 
 function address(ip: string | undefined): string {
