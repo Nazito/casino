@@ -10,6 +10,8 @@ export interface Player {
   displayName: string;
   balance: number;
   dailyAvailable: boolean;
+  dailyGrant: number;
+  minStake: number;
   spins: SpinView[];
 }
 

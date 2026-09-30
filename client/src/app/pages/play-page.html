@@ -64,8 +64,8 @@
       Крутить
     </button>
     @if (player()!.dailyAvailable) {
-      <button type="button" (click)="claimDaily()" [disabled]="busy()">Забрать 2000 коинов</button>
-    } @else if (player()!.balance < 10) {
+      <button type="button" (click)="claimDaily()" [disabled]="busy()">Забрать {{ player()!.dailyGrant }} коинов</button>
+    } @else if (player()!.balance < player()!.minStake) {
       <p>Дневные коины уже забраны. Следующие будут завтра.</p>
     }
     @if (player()!.spins.length) {

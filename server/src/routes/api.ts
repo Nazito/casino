@@ -13,9 +13,9 @@ import {
   verifyPassword,
 } from '../auth.js';
 import { dbReady } from '../db.js';
-import { clearFailures, isLocked, recordFailure } from '../login-limit.js';
 import { isNeonFruitsStake, payout, spinReels } from '../games/neon-fruits.js';
-import { MIN_STAKE, STARTING_BALANCE, User, canClaimDaily, claimDaily, settleSpin } from '../models/user.js';
+import { allowIp, allowRegistration, clearLoginFailures, loginBlocked, recordLoginFailure } from '../login-limit.js';
+import { DAILY_GRANT, MIN_STAKE, STARTING_BALANCE, User, canClaimDaily, claimDaily, settleSpin } from '../models/user.js';
 
 export const api = Router();
 
@@ -48,8 +48,17 @@ api.post('/auth/register', async (req, res) => {
     return;
   }
 
+  if (!(await allowIp(req.ip))) {
+    res.status(429).json({ error: 'too_many_attempts' });
+    return;
+  }
+  if (!(await allowRegistration(req.ip))) {
+    res.status(429).json({ error: 'too_many_attempts' });
+    return;
+  }
+
   const key = loginKey(username);
-  if (await User.exists({ $or: [{ loginKey: key }, { displayName: username }] })) {
+  if (await User.exists({ $or: [{ loginKey: key }, { displayName: sameName(username) }] })) {
     res.status(409).json({ error: 'username_taken' });
     return;
   }
@@ -89,8 +98,11 @@ api.post('/auth/login', async (req, res) => {
   }
 
   const key = loginKey(username);
-  const limitKey = `${req.ip ?? ''}:${key}`;
-  if (isLocked(limitKey)) {
+  if (!(await allowIp(req.ip))) {
+    res.status(429).json({ error: 'too_many_attempts' });
+    return;
+  }
+  if (await loginBlocked(key)) {
     res.status(429).json({ error: 'too_many_attempts' });
     return;
   }
@@ -104,20 +116,29 @@ api.post('/auth/login', async (req, res) => {
   }
 
   if (!user || !matches) {
-    recordFailure(limitKey);
+    await recordLoginFailure(key);
     res.status(401).json({ error: 'invalid_credentials' });
     return;
   }
 
-  clearFailures(limitKey);
+  await clearLoginFailures(key);
   await startSession(res, user._id.toString());
   res.json(publicUser(user));
 });
 
 api.post('/auth/logout', async (req, res) => {
-  if (dbReady()) {
-    await endSession(req, res);
+  if (!dbReady()) {
+    res.status(503).json({ error: 'database_unavailable' });
+    return;
   }
+
+  try {
+    await endSession(req, res);
+  } catch {
+    res.status(503).json({ error: 'database_unavailable' });
+    return;
+  }
+
   res.status(204).end();
 });
 
@@ -136,7 +157,7 @@ api.post('/wallet/daily', async (req, res) => {
     return;
   }
 
-  res.json(publicUser(updated));
+  res.json({ granted: DAILY_GRANT, ...publicUser(updated) });
 });
 
 api.post('/games/neon-fruits/spin', async (req, res) => {
@@ -210,8 +231,15 @@ function publicUser(user: {
     displayName: user.displayName,
     balance: user.balance,
     dailyAvailable: canClaimDaily(user.balance, user.lastDailyKey),
+    dailyGrant: DAILY_GRANT,
+    minStake: MIN_STAKE,
     spins,
   };
+}
+
+function sameName(username: string) {
+  const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return { $regex: `^${escaped}$`, $options: 'i' };
 }
 
 function isDuplicate(error: unknown): boolean {

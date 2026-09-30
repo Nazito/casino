@@ -38,18 +38,22 @@ export class Session {
     return this.http.post<void>('/api/auth/logout', {}).pipe(tap(() => this.player.set(null)));
   }
 
-  claimDaily(): Observable<Player> {
-    return this.http.post<Player>('/api/wallet/daily', {}).pipe(tap((player) => this.player.set(player)));
+  claimDaily(): Observable<Player & { granted: number }> {
+    return this.http.post<Player & { granted: number }>('/api/wallet/daily', {}).pipe(
+      tap((player) => this.player.set(player)),
+    );
   }
 
-  spin(stake: number): Observable<SpinResponse> {
-    return this.http.post<SpinResponse>('/api/games/neon-fruits/spin', { stake }).pipe(
+  spin(slug: string, stake: number): Observable<SpinResponse> {
+    return this.http.post<SpinResponse>(`/api/games/${encodeURIComponent(slug)}/spin`, { stake }).pipe(
       tap((result) => {
         this.player.set({
           id: result.id,
           displayName: result.displayName,
           balance: result.balance,
           dailyAvailable: result.dailyAvailable,
+          dailyGrant: result.dailyGrant,
+          minStake: result.minStake,
           spins: result.spins,
         });
       }),

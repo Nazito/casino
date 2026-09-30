@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, afterNextRender, inject, signal } from '@angular/core';
+import { Component, DestroyRef, afterNextRender, inject, signal } from '@angular/core';
 import { Meta } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { findGame } from '../games';
 import { stakes, symbolLabel } from '../player';
 import { Session } from '../session';
@@ -28,16 +29,25 @@ export class PlayPage {
   protected readonly selectedStake = signal<(typeof stakes)[number]>(10);
   protected readonly reels = signal<string[]>(['seven', 'star', 'cherry']);
 
+  private readonly subscriptions = new Subscription();
+  private flickerId: number | null = null;
+
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.stopFlicker();
+      this.subscriptions.unsubscribe();
+    });
     inject(Meta).updateTag({ name: 'robots', content: 'noindex' });
     afterNextRender(() => {
-      this.session.load().subscribe({
-        error: (error: unknown) => {
-          this.error.set(this.message(error));
-          this.ready.set(true);
-        },
-        complete: () => this.ready.set(true),
-      });
+      this.track(
+        this.session.load().subscribe({
+          error: (error: unknown) => {
+            this.error.set(this.message(error));
+            this.ready.set(true);
+          },
+          complete: () => this.ready.set(true),
+        }),
+      );
     });
   }
 
@@ -70,18 +80,18 @@ export class PlayPage {
 
     this.error.set('');
     this.busy.set(true);
-    request.subscribe({
+    this.track(request.subscribe({
       next: () => this.busy.set(false),
       error: (error: unknown) => {
         this.busy.set(false);
         this.error.set(this.message(error));
       },
-    });
+    }));
   }
 
   protected logout(): void {
     this.busy.set(true);
-    this.session.logout().subscribe({
+    this.track(this.session.logout().subscribe({
       next: () => {
         this.busy.set(false);
         this.outcome.set('');
@@ -91,22 +101,22 @@ export class PlayPage {
         this.busy.set(false);
         this.error.set(this.message(error));
       },
-    });
+    }));
   }
 
   protected claimDaily(): void {
     this.error.set('');
     this.busy.set(true);
-    this.session.claimDaily().subscribe({
-      next: () => {
+    this.track(this.session.claimDaily().subscribe({
+      next: (result) => {
         this.busy.set(false);
-        this.outcome.set('Начислено 2000 коинов');
+        this.outcome.set(`Начислено ${result.granted} коинов`);
       },
       error: (error: unknown) => {
         this.busy.set(false);
         this.error.set(this.message(error));
       },
-    });
+    }));
   }
 
   protected spin(): void {
@@ -114,27 +124,43 @@ export class PlayPage {
     if (!player || this.spinning()) {
       return;
     }
+    if (this.slug !== 'neon-fruits') {
+      this.error.set('Эта игра ещё не собрана.');
+      return;
+    }
 
     this.error.set('');
     this.outcome.set('');
     this.spinning.set(true);
-    const flicker = window.setInterval(() => {
+    this.stopFlicker();
+    this.flickerId = window.setInterval(() => {
       this.reels.set([pickVisual(), pickVisual(), pickVisual()]);
     }, 90);
 
-    this.session.spin(this.selectedStake()).subscribe({
+    this.track(this.session.spin(this.slug, this.selectedStake()).subscribe({
       next: (result) => {
-        window.clearInterval(flicker);
+        this.stopFlicker();
         this.reels.set(result.reels);
         this.outcome.set(result.win > 0 ? `Выигрыш ${result.win}` : 'Мимо');
         this.spinning.set(false);
       },
       error: (error: unknown) => {
-        window.clearInterval(flicker);
+        this.stopFlicker();
         this.spinning.set(false);
         this.error.set(this.message(error));
       },
-    });
+    }));
+  }
+
+  private track(subscription: Subscription): void {
+    this.subscriptions.add(subscription);
+  }
+
+  private stopFlicker(): void {
+    if (this.flickerId !== null) {
+      window.clearInterval(this.flickerId);
+      this.flickerId = null;
+    }
   }
 
   private message(error: unknown): string {
@@ -157,7 +183,7 @@ export class PlayPage {
       case 'invalid_stake':
         return 'Такая ставка недоступна.';
       case 'daily_not_needed':
-        return 'Дневные коины выдаются, когда баланс меньше 10.';
+        return 'Дневные коины выдаются, когда баланса не хватает на минимальную ставку.';
       case 'daily_already_claimed':
         return 'Дневные коины уже забраны. Следующие будут завтра.';
       default:
