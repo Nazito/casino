@@ -1,0 +1,81 @@
+form,
+.stakes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+
+input,
+button {
+  font: inherit;
+  color: inherit;
+  background: #1c2030;
+  border: 1px solid #3a4058;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+button.active {
+  border-color: #f5c16c;
+}
+
+.modes {
+  display: flex;
+  gap: 8px;
+}
+
+button.link {
+  margin-left: 12px;
+  padding: 2px 8px;
+}
+
+.hint {
+  color: #a6adbd;
+}
+
+.reels {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.reel {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  font-size: 42px;
+  background: #1c2030;
+  border: 1px solid #3a4058;
+  border-radius: 12px;
+}
+
+.spinning .reel {
+  animation: blink 0.12s linear infinite;
+}
+
+.balance,
+.outcome {
+  min-height: 1.4em;
+}
+
+.error {
+  color: #ff8f8f;
+}
+
+.history {
+  padding-left: 18px;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
