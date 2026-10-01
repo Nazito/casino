@@ -20,3 +20,36 @@ nav {
   display: flex;
   gap: 16px;
 }
+
+footer {
+  margin-top: 48px;
+  color: #a6adbd;
+}
+
+footer nav {
+  margin-top: 8px;
+}
+
+.age-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 10, 16, 0.94);
+}
+
+.age-gate section {
+  max-width: 420px;
+}
+
+.age-gate button {
+  font: inherit;
+  color: inherit;
+  background: #1c2030;
+  border: 1px solid #3a4058;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-right: 8px;
+}

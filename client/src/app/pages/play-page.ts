@@ -141,7 +141,7 @@ export class PlayPage {
       next: (result) => {
         this.stopFlicker();
         this.reels.set(result.reels);
-        this.outcome.set(result.win > 0 ? `Выигрыш ${result.win}` : 'Мимо');
+        this.outcome.set(this.outcomeText(result.win, result.stake));
         this.spinning.set(false);
       },
       error: (error: unknown) => {
@@ -150,6 +150,16 @@ export class PlayPage {
         this.error.set(this.message(error));
       },
     }));
+  }
+
+  private outcomeText(win: number, stake: number): string {
+    if (win > stake) {
+      return `Начислено ${win} коинов`;
+    }
+    if (win === stake) {
+      return 'Ставка вернулась';
+    }
+    return 'Мимо';
   }
 
   private track(subscription: Subscription): void {
@@ -180,6 +190,10 @@ export class PlayPage {
         return 'Неверный логин или пароль.';
       case 'too_many_attempts':
         return 'Слишком много неудачных попыток. Попробуйте через 15 минут.';
+      case 'slow_down':
+        return 'Слишком частые спины. Подождите минуту.';
+      case 'bad_origin':
+        return 'Запрос отклонён.';
       case 'invalid_stake':
         return 'Такая ставка недоступна.';
       case 'daily_not_needed':

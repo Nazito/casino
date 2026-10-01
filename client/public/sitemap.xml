@@ -4,4 +4,6 @@
   <url><loc>http://localhost:4217/games</loc></url>
   <url><loc>http://localhost:4217/games/neon-fruits</loc></url>
   <url><loc>http://localhost:4217/rules</loc></url>
+  <url><loc>http://localhost:4217/terms</loc></url>
+  <url><loc>http://localhost:4217/privacy</loc></url>
 </urlset>

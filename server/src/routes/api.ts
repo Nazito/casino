@@ -1,4 +1,5 @@
 import { Router, type Request } from 'express';
+import rateLimit from 'express-rate-limit';
 import mongoose from 'mongoose';
 import {
   PASSWORD_MAX,
@@ -15,7 +16,27 @@ import {
 import { dbReady } from '../db.js';
 import { isNeonFruitsStake, payout, spinReels } from '../games/neon-fruits.js';
 import { allowIp, allowRegistration, clearLoginFailures, loginBlocked, recordLoginFailure } from '../login-limit.js';
-import { DAILY_GRANT, MIN_STAKE, STARTING_BALANCE, User, canClaimDaily, claimDaily, settleSpin } from '../models/user.js';
+import { DAILY_GRANT, MIN_STAKE, User, canClaimDaily, claimDaily, openAccount, settleSpin } from '../models/user.js';
+
+const registerBurst = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: 'too_many_attempts' });
+  },
+});
+
+const spinBurst = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 90,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: 'slow_down' });
+  },
+});
 
 export const api = Router();
 
@@ -31,7 +52,7 @@ api.get('/session', async (req, res) => {
   res.json(publicUser(user));
 });
 
-api.post('/auth/register', async (req, res) => {
+api.post('/auth/register', registerBurst, async (req, res) => {
   if (!dbReady()) {
     res.status(503).json({ error: 'database_unavailable' });
     return;
@@ -65,12 +86,10 @@ api.post('/auth/register', async (req, res) => {
 
   let user;
   try {
-    user = await User.create({
+    user = await openAccount({
       displayName: username,
       loginKey: key,
       passwordHash: await hashPassword(password),
-      balance: STARTING_BALANCE,
-      spins: [],
     });
   } catch (error) {
     if (isDuplicate(error)) {
@@ -166,7 +185,7 @@ api.post('/wallet/daily', async (req, res) => {
   res.json({ granted: DAILY_GRANT, ...publicUser(updated) });
 });
 
-api.post('/games/neon-fruits/spin', async (req, res) => {
+api.post('/games/neon-fruits/spin', spinBurst, async (req, res) => {
   const user = await currentUser(req, res);
   if (!user) {
     return;

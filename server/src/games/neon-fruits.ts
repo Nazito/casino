@@ -8,34 +8,34 @@ export const NEON_FRUITS_SYMBOLS = ['cherry', 'lemon', 'orange', 'plum', 'bell',
 
 export type NeonFruitsSymbol = (typeof NEON_FRUITS_SYMBOLS)[number];
 
-const WEIGHTS: Record<NeonFruitsSymbol, number> = {
-  cherry: 20,
-  lemon: 18,
+export const NEON_FRUITS_WEIGHTS: Record<NeonFruitsSymbol, number> = {
+  cherry: 30,
+  lemon: 22,
   orange: 16,
   plum: 12,
-  bell: 8,
-  star: 5,
-  seven: 3,
+  bell: 10,
+  star: 6,
+  seven: 4,
 };
 
 const THREE_KIND: Record<NeonFruitsSymbol, number> = {
-  cherry: 4,
-  lemon: 5,
-  orange: 8,
-  plum: 10,
-  bell: 15,
-  star: 20,
-  seven: 50,
+  cherry: 8,
+  lemon: 8,
+  orange: 10,
+  plum: 20,
+  bell: 40,
+  star: 80,
+  seven: 150,
 };
 
 const PAIR: Record<NeonFruitsSymbol, number> = {
   cherry: 2,
-  lemon: 1,
-  orange: 1,
-  plum: 1,
-  bell: 1,
-  star: 1,
-  seven: 1,
+  lemon: 0,
+  orange: 2,
+  plum: 0,
+  bell: 0,
+  star: 0,
+  seven: 0,
 };
 
 export function isNeonFruitsStake(value: number): value is NeonFruitsStake {
@@ -67,14 +67,14 @@ export function payout(reels: readonly NeonFruitsSymbol[], stake: number): numbe
 }
 
 function pickSymbol(): NeonFruitsSymbol {
-  const total = NEON_FRUITS_SYMBOLS.reduce((sum, symbol) => sum + WEIGHTS[symbol], 0);
+  const total = NEON_FRUITS_SYMBOLS.reduce((sum, symbol) => sum + NEON_FRUITS_WEIGHTS[symbol], 0);
   let roll = randomInt(total);
 
   for (const symbol of NEON_FRUITS_SYMBOLS) {
-    if (roll < WEIGHTS[symbol]) {
+    if (roll < NEON_FRUITS_WEIGHTS[symbol]) {
       return symbol;
     }
-    roll -= WEIGHTS[symbol];
+    roll -= NEON_FRUITS_WEIGHTS[symbol];
   }
 
   return 'cherry';

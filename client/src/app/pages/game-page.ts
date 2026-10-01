@@ -10,6 +10,7 @@ import { Seo } from '../seo';
     @if (game) {
       <h1>{{ game.title }}</h1>
       <p>{{ game.description }}</p>
+      <p>Коины на этой странице и в игре не имеют денежной ценности.</p>
       <a [routerLink]="['/play', game.slug]">Играть</a>
     } @else {
       <h1>Игра не найдена</h1>
@@ -24,7 +25,7 @@ export class GamePage {
   constructor() {
     const game = this.game;
     inject(Seo).apply(
-      game ? `${game.title} — social casino` : 'Игра не найдена',
+      game ? `${game.title} — развлекательный слот` : 'Игра не найдена',
       game?.description ?? 'Такой игры нет.',
       game ? `/games/${game.slug}` : '/games',
     );
