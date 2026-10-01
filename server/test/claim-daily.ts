@@ -2,9 +2,9 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import { Ledger } from '../src/models/ledger.js';
 import { DAILY_GRANT, MIN_STAKE, User, claimDaily } from '../src/models/user.js';
+import { ownProbe, probeName } from './probe-name.js';
 
 const attempts = 10;
-const probeName = /^probe_daily_/;
 
 if (!process.env.MONGODB_URI) {
   console.error('Нужен MONGODB_URI');
@@ -40,20 +40,21 @@ process.once('SIGTERM', () => {
   void finish(1);
 });
 
-const leftovers = await User.find({ displayName: probeName }, { _id: 1 });
+const leftovers = await User.find({ displayName: ownProbe('d') }, { _id: 1 });
 for (const leftover of leftovers) {
   await removeUser(leftover._id);
 }
 if (leftovers.length > 0) {
-  console.log(`Убраны прошлые пробные аккаунты: ${leftovers.length}`);
+  console.log(`Убраны пробные аккаунты этого прогона: ${leftovers.length}`);
 }
 
 const now = new Date();
-const stamp = Date.now();
+const fundedName = probeName('d', '_f');
+const emptyName = probeName('d', '_e');
 
 const funded = await User.create({
-  displayName: `probe_daily_funded_${stamp}`,
-  loginKey: `probe_daily_funded_${stamp}`,
+  displayName: fundedName,
+  loginKey: fundedName,
   passwordHash: 'probe',
   balance: MIN_STAKE,
   spins: [],
@@ -61,8 +62,8 @@ const funded = await User.create({
 userIds.push(funded._id);
 
 const empty = await User.create({
-  displayName: `probe_daily_empty_${stamp}`,
-  loginKey: `probe_daily_empty_${stamp}`,
+  displayName: emptyName,
+  loginKey: emptyName,
   passwordHash: 'probe',
   balance: 0,
   spins: [],
