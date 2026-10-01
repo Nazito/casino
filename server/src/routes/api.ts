@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { Router, type Request } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import mongoose from 'mongoose';
@@ -35,7 +34,7 @@ const spinBurst = rateLimit({
   limit: 90,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => sessionKey(req) ?? clientAddress(req),
+  keyGenerator: async (req) => (await playerKey(req)) ?? clientAddress(req),
   handler: (_req, res) => {
     res.status(429).json({ error: 'slow_down' });
   },
@@ -282,10 +281,11 @@ function clientAddress(req: Request): string {
   return req.ip ? ipKeyGenerator(req.ip) : 'unknown';
 }
 
-function sessionKey(req: Request): string | null {
-  const sid = req.cookies?.sid;
-  if (typeof sid !== 'string' || sid.length === 0) {
+async function playerKey(req: Request): Promise<string | null> {
+  try {
+    const userId = await readUserId(req);
+    return userId ? `user:${userId}` : null;
+  } catch {
     return null;
   }
-  return createHash('sha256').update(sid).digest('base64url');
 }
