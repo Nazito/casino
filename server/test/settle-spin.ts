@@ -6,6 +6,7 @@ import { User, settleSpin } from '../src/models/user.js';
 const stake = 10;
 const spins = 20;
 const affordable = 5;
+const probeName = /^probe_parallel_/;
 
 if (!process.env.MONGODB_URI) {
   console.error('Нужен MONGODB_URI');
@@ -13,6 +14,41 @@ if (!process.env.MONGODB_URI) {
 }
 
 await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 20_000 });
+
+let userId: mongoose.Types.ObjectId | null = null;
+let closing = false;
+
+async function removeUser(id: mongoose.Types.ObjectId) {
+  await Ledger.deleteMany({ userId: id });
+  await User.deleteOne({ _id: id });
+}
+
+async function finish(code: number) {
+  if (closing) return;
+  closing = true;
+  try {
+    if (userId) await removeUser(userId);
+  } finally {
+    userId = null;
+    if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+    process.exit(code);
+  }
+}
+
+process.once('SIGINT', () => {
+  void finish(1);
+});
+process.once('SIGTERM', () => {
+  void finish(1);
+});
+
+const leftovers = await User.find({ displayName: probeName }, { _id: 1 });
+for (const leftover of leftovers) {
+  await removeUser(leftover._id);
+}
+if (leftovers.length > 0) {
+  console.log(`Убраны прошлые пробные аккаунты: ${leftovers.length}`);
+}
 
 const name = `probe_parallel_${Date.now()}`;
 const user = await User.create({
@@ -22,6 +58,7 @@ const user = await User.create({
   balance: stake * affordable,
   spins: [],
 });
+userId = user._id;
 
 let failed = false;
 
@@ -39,22 +76,29 @@ try {
   const rejected = settled.filter((item) => item.status === 'rejected');
   const succeeded = settled.filter((item) => item.status === 'fulfilled' && item.value !== null);
   const fresh = await User.findById(user._id);
-  failed = rejected.length !== 0 || succeeded.length !== affordable || fresh?.balance !== 0;
+  const rows = await Ledger.find({ userId: user._id });
+  const deltaSum = rows.reduce((sum, row) => sum + row.delta, 0);
+  const ledgerOk =
+    rows.length === affordable && rows.every((row) => row.type === 'spin') && deltaSum === -stake * affordable;
+  failed = rejected.length !== 0 || succeeded.length !== affordable || fresh?.balance !== 0 || !ledgerOk;
   if (failed) {
     console.error(
       JSON.stringify({
         rejected: rejected.length,
         succeeded: succeeded.length,
         balance: fresh?.balance ?? null,
+        ledgerRows: rows.length,
+        deltaSum,
       }),
     );
   } else {
-    console.log(`OK: ${succeeded.length} спинов из ${spins}, баланс ${fresh?.balance}, ошибок ${rejected.length}`);
+    console.log(
+      `OK: ${succeeded.length} спинов из ${spins}, баланс ${fresh?.balance}, строк журнала ${rows.length}, ошибок ${rejected.length}`,
+    );
   }
+} catch (error) {
+  failed = true;
+  console.error(error);
 } finally {
-  await Ledger.deleteMany({ userId: user._id });
-  await User.deleteOne({ _id: user._id });
-  await mongoose.disconnect();
+  await finish(failed ? 1 : 0);
 }
-
-process.exit(failed ? 1 : 0);
