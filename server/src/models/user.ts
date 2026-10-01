@@ -59,9 +59,7 @@ export interface SpinRecord {
 }
 
 export async function openAccount(fields: { displayName: string; loginKey: string; passwordHash: string }) {
-  const session = await mongoose.startSession();
-  try {
-    session.startTransaction();
+  return inTransaction(async (session) => {
     const [user] = await User.create([{ ...fields, balance: STARTING_BALANCE, spins: [] }], { session });
     if (!user) {
       throw new Error('account was not created');
@@ -78,22 +76,12 @@ export async function openAccount(fields: { displayName: string; loginKey: strin
       ],
       { session },
     );
-    await session.commitTransaction();
     return user;
-  } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-    throw error;
-  } finally {
-    await session.endSession();
-  }
+  });
 }
 
 export async function claimDaily(userId: string, now = new Date()) {
-  const session = await mongoose.startSession();
-  try {
-    session.startTransaction();
+  return inTransaction(async (session) => {
     const updated = await User.findOneAndUpdate(
       {
         _id: userId,
@@ -104,7 +92,6 @@ export async function claimDaily(userId: string, now = new Date()) {
       { new: true, session },
     );
     if (!updated) {
-      await session.abortTransaction();
       return null;
     }
     await Ledger.create(
@@ -119,22 +106,12 @@ export async function claimDaily(userId: string, now = new Date()) {
       ],
       { session },
     );
-    await session.commitTransaction();
     return updated;
-  } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-    throw error;
-  } finally {
-    await session.endSession();
-  }
+  });
 }
 
 export async function settleSpin(userId: string, spin: SpinRecord) {
-  const session = await mongoose.startSession();
-  try {
-    session.startTransaction();
+  return inTransaction(async (session) => {
     const updated = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: spin.stake } },
       {
@@ -149,7 +126,6 @@ export async function settleSpin(userId: string, spin: SpinRecord) {
       { new: true, session },
     );
     if (!updated) {
-      await session.abortTransaction();
       return null;
     }
     await Ledger.create(
@@ -167,13 +143,18 @@ export async function settleSpin(userId: string, spin: SpinRecord) {
       ],
       { session },
     );
-    await session.commitTransaction();
     return updated;
-  } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-    throw error;
+  });
+}
+
+async function inTransaction<T>(work: (session: mongoose.ClientSession) => Promise<T>): Promise<T> {
+  const session = await mongoose.startSession();
+  try {
+    let result!: T;
+    await session.withTransaction(async () => {
+      result = await work(session);
+    });
+    return result;
   } finally {
     await session.endSession();
   }

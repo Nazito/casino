@@ -152,11 +152,16 @@ export class PlayPage {
     }));
   }
 
+  protected spinChange(spin: { stake: number; win: number }): string {
+    return this.outcomeText(spin.win, spin.stake);
+  }
+
   private outcomeText(win: number, stake: number): string {
-    if (win > stake) {
-      return `Начислено ${win} коинов`;
+    const net = win - stake;
+    if (net > 0) {
+      return `Начислено ${net} коинов`;
     }
-    if (win === stake) {
+    if (net === 0) {
       return 'Ставка вернулась';
     }
     return 'Мимо';
@@ -184,6 +189,8 @@ export class PlayPage {
         return 'Логин: 3–24 символа, буквы, цифры, «_» и «-».';
       case 'invalid_password':
         return 'Пароль должен быть от 8 до 128 символов.';
+      case 'age_required':
+        return 'Регистрация доступна с 18 лет.';
       case 'username_taken':
         return 'Такой логин уже занят.';
       case 'invalid_credentials':

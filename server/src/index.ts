@@ -10,6 +10,8 @@ const app = express();
 const port = Number(process.env['PORT'] ?? 3017);
 const clientOrigin = process.env['CLIENT_ORIGIN'] ?? 'http://localhost:4217';
 
+app.set('trust proxy', 1);
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },

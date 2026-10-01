@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { Router, type Request } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import mongoose from 'mongoose';
 import {
   PASSWORD_MAX,
@@ -23,6 +24,7 @@ const registerBurst = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => clientAddress(req),
   handler: (_req, res) => {
     res.status(429).json({ error: 'too_many_attempts' });
   },
@@ -33,6 +35,7 @@ const spinBurst = rateLimit({
   limit: 90,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => sessionKey(req) ?? clientAddress(req),
   handler: (_req, res) => {
     res.status(429).json({ error: 'slow_down' });
   },
@@ -66,6 +69,10 @@ api.post('/auth/register', registerBurst, async (req, res) => {
   const password = req.body?.password;
   if (!validPassword(password)) {
     res.status(400).json({ error: 'invalid_password' });
+    return;
+  }
+  if (req.body?.adult !== true) {
+    res.status(400).json({ error: 'age_required' });
     return;
   }
 
@@ -269,4 +276,16 @@ function sameName(username: string) {
 
 function isDuplicate(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
+}
+
+function clientAddress(req: Request): string {
+  return req.ip ? ipKeyGenerator(req.ip) : 'unknown';
+}
+
+function sessionKey(req: Request): string | null {
+  const sid = req.cookies?.sid;
+  if (typeof sid !== 'string' || sid.length === 0) {
+    return null;
+  }
+  return createHash('sha256').update(sid).digest('base64url');
 }
