@@ -31,12 +31,13 @@
 | Метод и путь | Что делает | Ошибки |
 |---|---|---|
 | `GET /api/health` | `{ ok, database }` | — |
-| `GET /api/session` | текущий игрок | `401 unauthorized` |
-| `POST /api/auth/register` | `{ username, password, adult: true }` → игрок, сессия | `invalid_username`, `invalid_password`, `age_required`, `username_taken`, `too_many_attempts` |
-| `POST /api/auth/login` | `{ username, password }` → игрок, сессия | `invalid_credentials`, `too_many_attempts` |
+| `GET /api/session` | текущий игрок; если есть гостевая cookie, её коины уже сложены в баланс | `401 unauthorized` |
+| `POST /api/guest` | `{ slug }` → гостевая сессия: остаток спинов и коины этой игры | `too_many_guests`, `already_signed_in` |
+| `POST /api/auth/register` | `{ username, password, adult: true }` → игрок, сессия, гостевые коины | `invalid_username`, `invalid_password`, `age_required`, `username_taken`, `too_many_attempts` |
+| `POST /api/auth/login` | `{ username, password }` → игрок, сессия, гостевые коины | `invalid_credentials`, `too_many_attempts` |
 | `POST /api/auth/logout` | завершает сессию | — |
 | `POST /api/wallet/daily` | бонус при балансе < 10 | `daily_not_needed`, `daily_already_claimed` |
-| `POST /api/games/neon-fruits/spin` | `{ stake }` → барабаны, выигрыш, игрок | `invalid_stake`, `insufficient_balance`, `slow_down` |
+| `POST /api/games/neon-fruits/spin` | `{ stake }` → барабаны и выигрыш. С аккаунтом — любая ставка игры, без аккаунта — только 10 | `invalid_stake`, `insufficient_balance`, `guest_spins_spent`, `too_many_guests`, `slow_down` |
 
 Игрок в ответах: `id`, `displayName`, `balance`, `dailyAvailable`, `dailyGrant`, `minStake`, `spins` (последние 20).
 
@@ -48,6 +49,7 @@
   существует ли логин.
 - Сессия: случайный токен 32 байта в cookie `sid` (httpOnly, `sameSite: lax`, `secure` в проде), 30 дней.
   В базе хранится только SHA-256 токена.
+- Гость: такой же токен в cookie `gid`, 7 дней, 50 спинов. В базе — хеш, остаток спинов и счёт по каждой игре.
 
 ### Лимиты
 
@@ -57,7 +59,8 @@
 | регистрация | 3 аккаунта за 15 мин с IP | MongoDB `authlimits` |
 | вход и регистрация | 20 попыток за 15 мин с IP | MongoDB `authlimits` |
 | вход | 5 неверных паролей к существующему логину → логин заблокирован на 15 мин для всех IP; неизвестное имя в счётчик не попадает | MongoDB `authlimits` |
-| спин | 90 в минуту на игрока (или IP) | память процесса |
+| спин | 90 в минуту на игрока (или IP, если аккаунта нет) | память процесса |
+| гость | 5 новых проб за киевские сутки с IP | MongoDB `guestquotas` |
 
 Лимиты в памяти действуют на один процесс и сбрасываются при перезапуске.
 
@@ -67,7 +70,8 @@
 - Ежедневный бонус: 2 000, только при балансе < 10, раз в киевские сутки (`kyivDay`, `Europe/Kyiv`).
 - Каждое изменение баланса — одна транзакция `withTransaction` (повтор при конфликте записи):
   условный `findOneAndUpdate` (условие в фильтре, например `balance >= stake`) + запись в журнал `ledger`.
-- Журнал: `type` = `start`, `daily` или `spin`, `delta`, `balanceAfter`. Записи спинов живут 90 дней (TTL),
+- Без аккаунта ставка всегда 10, спинов 50 на все игры вместе. Проигрыш уменьшает коины этой игры, но не ниже нуля: ставка спина берётся из уже накопленных коинов игры, а если их нет — из одного гостевого спина. При входе сумма счетов игр прибавляется к балансу одной операцией `$inc` и строкой журнала `guest`. Гость после этого закрыт.
+- Журнал: `type` = `start`, `daily`, `spin` или `guest`, `delta`, `balanceAfter`. Записи спинов живут 90 дней (TTL),
   поэтому сумма журнала со временем перестаёт совпадать с балансом. Это ожидаемо.
 - В документе игрока дополнительно хранятся последние 20 спинов для интерфейса.
 
@@ -86,6 +90,8 @@
 | `sessions` | хеш токена, `userId`, `expiresAt` | по `expiresAt` |
 | `ledgers` | журнал изменений баланса | 90 дней только для `spin` |
 | `authlimits` | счётчики лимитов входа и регистрации | по `expiresAt` |
+| `guests` | проба без аккаунта: хеш cookie, спины, коины по играм | по `expiresAt`, 7 дней |
+| `guestquotas` | сколько новых проб создано с IP за сутки | по `expiresAt` |
 
 ## Клиент
 
@@ -96,7 +102,7 @@
 - Адрес сайта: `client/scripts/write-site.mjs` перед `start` и `build` пишет `site.generated.ts`, `robots.txt`
   и `sitemap.xml` из `SITE_ORIGIN` или `CLIENT_ORIGIN`. **Список путей sitemap задан в скрипте вручную** —
   новую публичную страницу добавляй и туда.
-- Состояние игрока — сервис `Session` (`session.ts`) на signals.
+- Состояние игрока — сервис `Session` (`session.ts`) на signals. На `/play/:slug` без аккаунта открывается гостевая сессия.
 - Символы барабанов — эмодзи как текст (`symbolLabel` в `player.ts`), рисуются шрифтом устройства.
 - 18+: модальное окно на сайте и обязательный флажок при регистрации (сервер проверяет `adult: true`).
 - Язык интерфейса пока русский (`lang="ru"`), переход на украинский — задача 3.1.
@@ -115,7 +121,7 @@
 ## Проверки и тесты
 
 - CI (`.github/workflows/ci.yml`) на каждый PR и push в `main`: сборка, `rtp`, `test:spins`, `test:daily`.
-- Тесты с базой — скрипты на `tsx` в `server/test/`. Имена тестовых аккаунтов —
+- Тесты с базой — скрипты на `tsx` в `server/test/`, включая `test:guest`. Имена тестовых аккаунтов —
   `probe_<вид>_<id запуска>` (`probe-name.ts`), каждый запуск удаляет только свои.
 
 ## Известный долг

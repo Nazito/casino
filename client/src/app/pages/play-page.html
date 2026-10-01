@@ -4,85 +4,102 @@
 
   @if (!ready()) {
     <p>Загрузка…</p>
-  } @else if (!player()) {
-    <div class="modes">
-      <button type="button" [class.active]="mode() === 'login'" (click)="switchMode('login')">Вход</button>
-      <button type="button" [class.active]="mode() === 'register'" (click)="switchMode('register')">
-        Регистрация
-      </button>
-    </div>
-    <form (submit)="submitAuth($event)">
-      <p>Аккаунт для игры на развлекательные коины. Денег здесь нет.</p>
-      <label>
-        Логин
-        <input
-          name="username"
-          autocomplete="username"
-          minlength="3"
-          maxlength="24"
-          required
-          [disabled]="busy()"
-        />
-      </label>
-      <label>
-        Пароль
-        <input
-          name="password"
-          type="password"
-          [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
-          minlength="8"
-          maxlength="128"
-          required
-          [disabled]="busy()"
-        />
-      </label>
-      @if (mode() === 'register') {
-        <label class="check">
-          <input name="accept" type="checkbox" required [disabled]="busy()" />
-          Мне есть 18 лет.
-        </label>
-        <p class="hint">
-          Логин 3–24 символа: буквы, цифры, «_» и «-». Пароль от 8 символов. Регистрация означает
-          принятие <a routerLink="/terms">соглашения</a> и <a routerLink="/privacy">политики конфиденциальности</a>.
-        </p>
-      }
-      <button type="submit" [disabled]="busy()">
-        {{ mode() === 'register' ? 'Создать аккаунт' : 'Войти' }}
-      </button>
-    </form>
   } @else {
-    <p class="balance">
-      {{ player()!.displayName }} · {{ player()!.balance }} коинов
-      <button type="button" class="link" (click)="logout()" [disabled]="busy()">Выйти</button>
-    </p>
-    <div class="reels" [class.spinning]="spinning()">
-      @for (reel of reels(); track $index) {
-        <div class="reel">{{ label(reel) }}</div>
-      }
-    </div>
-    <p class="outcome">{{ outcome() }}</p>
-    <div class="stakes">
-      @for (stake of stakes; track stake) {
-        <button type="button" [class.active]="selectedStake() === stake" (click)="selectedStake.set(stake)">
-          {{ stake }}
-        </button>
-      }
-    </div>
-    <button type="button" (click)="spin()" [disabled]="spinning() || player()!.balance < selectedStake()">
-      Крутить
-    </button>
-    @if (player()!.dailyAvailable) {
-      <button type="button" (click)="claimDaily()" [disabled]="busy()">Забрать {{ player()!.dailyGrant }} коинов</button>
-    } @else if (player()!.balance < player()!.minStake) {
-      <p>Дневные коины уже забраны. Следующие будут завтра.</p>
+    @if (player(); as person) {
+      <p class="balance">
+        {{ person.displayName }} · {{ person.balance }} коинов
+        <button type="button" class="link" (click)="logout()" [disabled]="busy()">Выйти</button>
+      </p>
+    } @else if (guest(); as trial) {
+      <p class="balance">Без аккаунта · {{ trial.balance }} коинов в этой игре</p>
+      <p class="hint">
+        Осталось спинов: {{ trial.spinsLeft }} из {{ trial.spinLimit }}. Во всех играх сейчас {{ trial.total }}
+        коинов. После входа они складываются в один баланс, а неиспользованные спины пропадают.
+      </p>
     }
-    @if (player()!.spins.length) {
-      <h2>Последние спины</h2>
-      <ul class="history">
-        @for (spin of player()!.spins.slice(0, 8); track $index) {
-          <li>{{ line(spin.reels) }} · ставка {{ spin.stake }} · {{ spinChange(spin) }}</li>
+
+    @if (player() || guest()) {
+      <div class="reels" [class.spinning]="spinning()">
+        @for (reel of reels(); track $index) {
+          <div class="reel">{{ label(reel) }}</div>
         }
-      </ul>
+      </div>
+      <p class="outcome">{{ outcome() }}</p>
+      @if (player()) {
+        <div class="stakes">
+          @for (stake of stakes; track stake) {
+            <button type="button" [class.active]="selectedStake() === stake" (click)="selectedStake.set(stake)">
+              {{ stake }}
+            </button>
+          }
+        </div>
+      } @else {
+        <p class="hint">Ставка без аккаунта — {{ guest()!.stake }}.</p>
+      }
+      <button type="button" (click)="spin()" [disabled]="cannotSpin()">Крутить</button>
+      @if (player(); as person) {
+        @if (person.dailyAvailable) {
+          <button type="button" (click)="claimDaily()" [disabled]="busy()">Забрать {{ person.dailyGrant }} коинов</button>
+        } @else if (person.balance < person.minStake) {
+          <p>Дневные коины уже забраны. Следующие будут завтра.</p>
+        }
+      }
+      @if (history().length) {
+        <h2>Последние спины</h2>
+        <ul class="history">
+          @for (spin of history().slice(0, 8); track $index) {
+            <li>{{ line(spin.reels) }} · ставка {{ spin.stake }} · {{ spinChange(spin) }}</li>
+          }
+        </ul>
+      }
+    }
+
+    @if (!player()) {
+      <div class="modes">
+        <button type="button" [class.active]="mode() === 'login'" (click)="switchMode('login')">Вход</button>
+        <button type="button" [class.active]="mode() === 'register'" (click)="switchMode('register')">
+          Регистрация
+        </button>
+      </div>
+      <form (submit)="submitAuth($event)">
+        <p>Аккаунт собирает коины из всех игр в один баланс. Денег здесь нет.</p>
+        <label>
+          Логин
+          <input
+            name="username"
+            autocomplete="username"
+            minlength="3"
+            maxlength="24"
+            required
+            [disabled]="busy()"
+          />
+        </label>
+        <label>
+          Пароль
+          <input
+            name="password"
+            type="password"
+            [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
+            minlength="8"
+            maxlength="128"
+            required
+            [disabled]="busy()"
+          />
+        </label>
+        @if (mode() === 'register') {
+          <label class="check">
+            <input name="accept" type="checkbox" required [disabled]="busy()" />
+            Мне есть 18 лет.
+          </label>
+          <p class="hint">
+            Логин 3–24 символа: буквы, цифры, «_» и «-». Пароль от 8 символов. Регистрация означает
+            принятие <a routerLink="/terms">соглашения</a> и <a routerLink="/privacy">политики конфиденциальности</a>.
+          </p>
+        }
+        <button type="submit" [disabled]="busy()">
+          {{ mode() === 'register' ? 'Создать аккаунт' : 'Войти' }}
+        </button>
+      </form>
     }
   }
 

@@ -1,4 +1,4 @@
-import { Router, type Request } from 'express';
+import { Router, type Request, type Response } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import mongoose from 'mongoose';
 import {
@@ -16,6 +16,18 @@ import {
 import { dbReady } from '../db.js';
 import { isNeonFruitsStake, payout, spinReels } from '../games/neon-fruits.js';
 import { allowIp, allowRegistration, clearLoginFailures, loginBlocked, recordLoginFailure } from '../login-limit.js';
+import {
+  GUEST_STAKE,
+  claimGuestTrial,
+  clearGuestCookie,
+  createGuest,
+  findGuest,
+  mergeGuest,
+  publicGuest,
+  readGuestToken,
+  setGuestCookie,
+  settleGuestSpin,
+} from '../models/guest.js';
 import { DAILY_GRANT, MIN_STAKE, User, canClaimDaily, claimDaily, openAccount, settleSpin } from '../models/user.js';
 
 const registerBurst = rateLimit({
@@ -51,7 +63,33 @@ api.get('/session', async (req, res) => {
   if (!user) {
     return;
   }
-  res.json(publicUser(user));
+  res.json((await takeGuestCoins(req, res, user)).body);
+});
+
+api.post('/guest', async (req, res) => {
+  if (!dbReady()) {
+    res.status(503).json({ error: 'database_unavailable' });
+    return;
+  }
+  if (await readUserId(req)) {
+    res.status(409).json({ error: 'already_signed_in' });
+    return;
+  }
+
+  const slug = typeof req.body?.slug === 'string' ? req.body.slug : '';
+  const existing = await findGuest(readGuestToken(req));
+  if (existing) {
+    res.json(publicGuest(existing, slug));
+    return;
+  }
+  if (!(await claimGuestTrial(clientAddress(req)))) {
+    res.status(429).json({ error: 'too_many_guests' });
+    return;
+  }
+
+  const created = await createGuest();
+  setGuestCookie(res, created.token);
+  res.status(201).json(publicGuest(created.guest, slug));
 });
 
 api.post('/auth/register', registerBurst, async (req, res) => {
@@ -107,7 +145,7 @@ api.post('/auth/register', registerBurst, async (req, res) => {
 
   await clearLoginFailures(key);
   await startSession(res, user._id.toString());
-  res.status(201).json(publicUser(user));
+  res.status(201).json((await takeGuestCoins(req, res, user)).body);
 });
 
 api.post('/auth/login', async (req, res) => {
@@ -154,7 +192,7 @@ api.post('/auth/login', async (req, res) => {
 
   await clearLoginFailures(key);
   await startSession(res, user._id.toString());
-  res.json(publicUser(user));
+  res.json((await takeGuestCoins(req, res, user)).body);
 });
 
 api.post('/auth/logout', async (req, res) => {
@@ -192,37 +230,71 @@ api.post('/wallet/daily', async (req, res) => {
 });
 
 api.post('/games/neon-fruits/spin', spinBurst, async (req, res) => {
-  const user = await currentUser(req, res);
-  if (!user) {
+  if (!dbReady()) {
+    res.status(503).json({ error: 'database_unavailable' });
     return;
   }
 
-  const stake = req.body?.stake;
-  if (typeof stake !== 'number' || !isNeonFruitsStake(stake)) {
+  const userId = await readUserId(req);
+  if (userId) {
+    const user = await currentUser(req, res);
+    if (!user) {
+      return;
+    }
+
+    const stake = req.body?.stake;
+    if (typeof stake !== 'number' || !isNeonFruitsStake(stake)) {
+      res.status(400).json({ error: 'invalid_stake' });
+      return;
+    }
+
+    const reels = spinReels();
+    const win = payout(reels, stake);
+    const updated = await settleSpin(user._id.toString(), {
+      stake,
+      win,
+      reels: [...reels],
+      createdAt: new Date(),
+    });
+    if (!updated) {
+      res.status(409).json({ error: 'insufficient_balance' });
+      return;
+    }
+
+    res.json({ reels, stake, win, ...publicUser(updated) });
+    return;
+  }
+
+  if (req.body?.stake !== GUEST_STAKE) {
     res.status(400).json({ error: 'invalid_stake' });
     return;
   }
 
+  let guest = await findGuest(readGuestToken(req));
+  if (!guest) {
+    if (!(await claimGuestTrial(clientAddress(req)))) {
+      res.status(429).json({ error: 'too_many_guests' });
+      return;
+    }
+    const created = await createGuest();
+    setGuestCookie(res, created.token);
+    guest = created.guest;
+  }
+
   const reels = spinReels();
-  const win = payout(reels, stake);
-  const updated = await settleSpin(user._id.toString(), {
-    stake,
+  const win = payout(reels, GUEST_STAKE);
+  const updated = await settleGuestSpin(guest._id.toString(), 'neon-fruits', {
+    stake: GUEST_STAKE,
     win,
     reels: [...reels],
     createdAt: new Date(),
   });
-
   if (!updated) {
-    res.status(409).json({ error: 'insufficient_balance' });
+    res.status(409).json({ error: 'guest_spins_spent' });
     return;
   }
 
-  res.json({
-    reels,
-    stake,
-    win,
-    ...publicUser(updated),
-  });
+  res.json({ reels, win, ...publicGuest(updated, 'neon-fruits') });
 });
 
 async function currentUser(
@@ -275,6 +347,23 @@ function sameName(username: string) {
 
 function isDuplicate(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
+}
+
+async function takeGuestCoins(
+  req: Request,
+  res: Response,
+  user: Parameters<typeof publicUser>[0],
+) {
+  const token = readGuestToken(req);
+  if (!token) {
+    return { body: publicUser(user) };
+  }
+  const merged = await mergeGuest(token, user._id.toString());
+  clearGuestCookie(res);
+  if (!merged || merged.absorbed === 0) {
+    return { body: publicUser(merged?.user ?? user) };
+  }
+  return { body: { ...publicUser(merged.user), absorbed: merged.absorbed } };
 }
 
 function clientAddress(req: Request): string {
