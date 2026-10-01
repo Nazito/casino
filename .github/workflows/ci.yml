@@ -47,3 +47,8 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: npm run test:daily --prefix server
+
+      - name: Guest spins
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run test:guest --prefix server

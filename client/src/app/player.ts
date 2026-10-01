@@ -3,6 +3,7 @@ export interface SpinView {
   win: number;
   reels: string[];
   createdAt: string;
+  delta?: number;
 }
 
 export interface Player {
@@ -19,6 +20,24 @@ export interface SpinResponse extends Player {
   reels: string[];
   stake: number;
   win: number;
+  absorbed?: number;
+}
+
+export interface GuestState {
+  guest: true;
+  spinsLeft: number;
+  spinLimit: number;
+  stake: number;
+  balance: number;
+  total: number;
+  minStake: number;
+  spins: SpinView[];
+}
+
+export interface GuestSpin extends GuestState {
+  reels: string[];
+  win: number;
+  delta: number;
 }
 
 export const stakes = [10, 50, 100, 500] as const;

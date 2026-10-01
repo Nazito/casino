@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const ledgerSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  type: { type: String, required: true, enum: ['start', 'daily', 'spin'] },
+  type: { type: String, required: true, enum: ['start', 'daily', 'spin', 'guest'] },
   delta: { type: Number, required: true },
   balanceAfter: { type: Number, required: true },
   stake: { type: Number },

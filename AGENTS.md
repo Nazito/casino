@@ -37,6 +37,7 @@ npm run build                        # клиент и сервер
 npm run rtp --prefix server          # RTP слота, падает вне 94–96%
 npm run test:spins --prefix server   # параллельные спины (пишет в базу)
 npm run test:daily --prefix server   # ежедневный бонус (пишет в базу)
+npm run test:guest --prefix server   # 50 спинов без аккаунта и сложение коинов (пишет в базу)
 ```
 
 Под песочницей Cursor `tsx` падает с `listen EPERM ... .pipe` — запускай без песочницы.

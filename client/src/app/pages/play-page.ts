@@ -20,6 +20,7 @@ export class PlayPage {
   protected readonly game = findGame(this.slug);
   protected readonly stakes = stakes;
   protected readonly player = this.session.player;
+  protected readonly guest = this.session.guest;
   protected readonly mode = signal<'login' | 'register'>('login');
   protected readonly ready = signal(false);
   protected readonly busy = signal(false);
@@ -40,7 +41,12 @@ export class PlayPage {
     inject(Meta).updateTag({ name: 'robots', content: 'noindex' });
     afterNextRender(() => {
       this.track(
-        this.session.load().subscribe({
+        this.session.load(this.slug).subscribe({
+          next: (player) => {
+            if (player?.absorbed) {
+              this.outcome.set(`Коины из игр сложены в один баланс: ${player.absorbed}`);
+            }
+          },
           error: (error: unknown) => {
             this.error.set(this.message(error));
             this.ready.set(true);
@@ -81,7 +87,12 @@ export class PlayPage {
     this.error.set('');
     this.busy.set(true);
     this.track(request.subscribe({
-      next: () => this.busy.set(false),
+      next: (player) => {
+        this.busy.set(false);
+        if (player.absorbed) {
+          this.outcome.set(`Коины из игр сложены в один баланс: ${player.absorbed}`);
+        }
+      },
       error: (error: unknown) => {
         this.busy.set(false);
         this.error.set(this.message(error));
@@ -91,7 +102,8 @@ export class PlayPage {
 
   protected logout(): void {
     this.busy.set(true);
-    this.track(this.session.logout().subscribe({
+    this.error.set('');
+    this.track(this.session.logout(this.slug).subscribe({
       next: () => {
         this.busy.set(false);
         this.outcome.set('');
@@ -119,9 +131,26 @@ export class PlayPage {
     }));
   }
 
+  protected cannotSpin(): boolean {
+    if (this.spinning()) {
+      return true;
+    }
+    const player = this.player();
+    if (player) {
+      return player.balance < this.selectedStake();
+    }
+    const guest = this.guest();
+    return !guest || guest.spinsLeft < 1;
+  }
+
+  protected history() {
+    return this.player()?.spins ?? this.guest()?.spins ?? [];
+  }
+
   protected spin(): void {
     const player = this.player();
-    if (!player || this.spinning()) {
+    const guest = this.guest();
+    if (this.spinning() || (!player && !guest)) {
       return;
     }
     if (this.slug !== 'neon-fruits') {
@@ -137,31 +166,39 @@ export class PlayPage {
       this.reels.set([pickVisual(), pickVisual(), pickVisual()]);
     }, 90);
 
-    this.track(this.session.spin(this.slug, this.selectedStake()).subscribe({
+    const startedAsGuest = !player;
+    const stake = player ? this.selectedStake() : guest!.stake;
+    this.track(this.session.spin(this.slug, stake).subscribe({
       next: (result) => {
         this.stopFlicker();
-        this.reels.set(result.reels);
-        this.outcome.set(this.outcomeText(result.win, result.stake));
         this.spinning.set(false);
+        if (startedAsGuest && this.player()) {
+          return;
+        }
+        this.reels.set(result.reels);
+        this.outcome.set(this.outcomeText(result.win, result.stake, 'delta' in result ? result.delta : undefined));
       },
       error: (error: unknown) => {
         this.stopFlicker();
         this.spinning.set(false);
+        if (startedAsGuest && this.player()) {
+          return;
+        }
         this.error.set(this.message(error));
       },
     }));
   }
 
-  protected spinChange(spin: { stake: number; win: number }): string {
-    return this.outcomeText(spin.win, spin.stake);
+  protected spinChange(spin: { stake: number; win: number; delta?: number }): string {
+    return this.outcomeText(spin.win, spin.stake, spin.delta);
   }
 
-  private outcomeText(win: number, stake: number): string {
-    const net = win - stake;
+  private outcomeText(win: number, stake: number, delta?: number): string {
+    const net = delta ?? win - stake;
     if (net > 0) {
       return `Начислено ${net} коинов`;
     }
-    if (net === 0) {
+    if (net === 0 && win === stake) {
       return 'Ставка вернулась';
     }
     return 'Мимо';
@@ -203,6 +240,12 @@ export class PlayPage {
         return 'Запрос отклонён.';
       case 'invalid_stake':
         return 'Такая ставка недоступна.';
+      case 'guest_spins_spent':
+        return '50 спинов без аккаунта уже использованы. Войдите, чтобы играть дальше.';
+      case 'too_many_guests':
+        return 'Слишком много проб без аккаунта с этого адреса. Войдите или попробуйте завтра.';
+      case 'already_signed_in':
+        return 'Сначала выйдите из аккаунта.';
       case 'daily_not_needed':
         return 'Дневные коины выдаются, когда баланса не хватает на минимальную ставку.';
       case 'daily_already_claimed':

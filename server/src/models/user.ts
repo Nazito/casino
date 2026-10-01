@@ -147,6 +147,41 @@ export async function settleSpin(userId: string, spin: SpinRecord) {
   });
 }
 
+export async function addGuestTake(
+  userId: string,
+  amount: number,
+  session: mongoose.ClientSession,
+): Promise<UserDocument | null> {
+  if (amount < 0) {
+    throw new Error('guest take is negative');
+  }
+  if (amount === 0) {
+    return User.findById(userId).session(session);
+  }
+
+  const updated = await User.findOneAndUpdate(
+    { _id: userId },
+    { $inc: { balance: amount } },
+    { new: true, session },
+  );
+  if (!updated) {
+    throw new Error('account was not found');
+  }
+  await Ledger.create(
+    [
+      {
+        userId: updated._id,
+        type: 'guest',
+        delta: amount,
+        balanceAfter: updated.balance,
+        createdAt: new Date(),
+      },
+    ],
+    { session },
+  );
+  return updated;
+}
+
 async function inTransaction<T>(work: (session: mongoose.ClientSession) => Promise<T>): Promise<T> {
   const session = await mongoose.startSession();
   try {
