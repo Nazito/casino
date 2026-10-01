@@ -2,11 +2,11 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import { Ledger } from '../src/models/ledger.js';
 import { User, settleSpin } from '../src/models/user.js';
+import { ownProbe, probeName } from './probe-name.js';
 
 const stake = 10;
 const spins = 20;
 const affordable = 5;
-const probeName = /^probe_parallel_/;
 
 if (!process.env.MONGODB_URI) {
   console.error('Нужен MONGODB_URI');
@@ -42,15 +42,15 @@ process.once('SIGTERM', () => {
   void finish(1);
 });
 
-const leftovers = await User.find({ displayName: probeName }, { _id: 1 });
+const leftovers = await User.find({ displayName: ownProbe('p') }, { _id: 1 });
 for (const leftover of leftovers) {
   await removeUser(leftover._id);
 }
 if (leftovers.length > 0) {
-  console.log(`Убраны прошлые пробные аккаунты: ${leftovers.length}`);
+  console.log(`Убраны пробные аккаунты этого прогона: ${leftovers.length}`);
 }
 
-const name = `probe_parallel_${Date.now()}`;
+const name = probeName('p');
 const user = await User.create({
   displayName: name,
   loginKey: name,

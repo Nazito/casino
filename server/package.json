@@ -11,7 +11,8 @@
     "start": "tsx src/index.ts",
     "build": "tsc",
     "rtp": "tsx scripts/rtp.ts",
-    "test:spins": "tsx test/settle-spin.ts"
+    "test:spins": "tsx test/settle-spin.ts",
+    "test:daily": "tsx test/claim-daily.ts"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
