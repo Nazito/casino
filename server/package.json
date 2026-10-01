@@ -11,7 +11,7 @@
     "start": "tsx src/index.ts",
     "build": "tsc",
     "rtp": "tsx scripts/rtp.ts",
-    "test": "tsx --test test/unit/payout.test.ts test/unit/wallet.test.ts test/unit/auth.test.ts",
+    "test": "tsx --test test/unit/payout.test.ts test/unit/wallet.test.ts test/unit/auth.test.ts test/unit/app.test.ts",
     "test:db": "tsx test/settle-spin.ts && tsx test/claim-daily.ts && tsx test/guest-play.ts && tsx --test test/db/auth-http.test.ts",
     "test:spins": "tsx test/settle-spin.ts",
     "test:daily": "tsx test/claim-daily.ts",

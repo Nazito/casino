@@ -56,7 +56,11 @@ const spinBurst = rateLimit({
 export const api = Router();
 
 api.get('/health', (_req, res) => {
-  res.json({ ok: true, database: dbReady() });
+  if (!dbReady()) {
+    res.status(503).json({ ok: false, database: false });
+    return;
+  }
+  res.json({ ok: true, database: true });
 });
 
 api.get('/session', async (req, res) => {
