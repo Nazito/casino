@@ -10,7 +10,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "build": "tsc",
-    "rtp": "tsx scripts/rtp.ts"
+    "rtp": "tsx scripts/rtp.ts",
+    "test:spins": "tsx test/settle-spin.ts"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
