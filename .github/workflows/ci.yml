@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci
+          npm ci --prefix client
+          npm ci --prefix server
+
+      - name: Build
+        env:
+          NG_CLI_ANALYTICS: 'false'
+        run: npm run build
+
+      - name: Slot return
+        run: npm run rtp --prefix server
+
+      - name: Parallel spins
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run test:spins --prefix server
+
+      - name: Daily grant
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run test:daily --prefix server
