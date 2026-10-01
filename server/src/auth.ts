@@ -22,6 +22,10 @@ export function loginKey(username: string): string {
   return username.toLowerCase();
 }
 
+export function isProbeName(username: string): boolean {
+  return loginKey(username).startsWith('probe_');
+}
+
 export function validPassword(value: unknown): value is string {
   return typeof value === 'string' && value.length >= PASSWORD_MIN && value.length <= PASSWORD_MAX;
 }

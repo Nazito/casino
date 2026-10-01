@@ -19,7 +19,8 @@ export function connectDb(uri: string | undefined): void {
     mongoose
       .connect(uri, { serverSelectionTimeoutMS: 10_000 })
       .then(() => {
-        console.log('MongoDB подключена');
+        const { host, name } = mongoose.connection;
+        console.log(`MongoDB подключена: ${host}/${name}`);
       })
       .catch((error: unknown) => {
         console.error(`Не удалось подключиться к MongoDB, повтор через ${RETRY_MS / 1000} с`, error);
