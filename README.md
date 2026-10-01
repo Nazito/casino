@@ -17,4 +17,8 @@ npm run dev
 Сайт: http://localhost:4217  
 API: http://localhost:3017/api/health
 
-В `server/.env` нужна строка удалённого кластера MongoDB, не локальный `mongod`. Без `MONGODB_URI` API поднимается, а вход и спин отвечают 503.
+В `server/.env` нужна строка удалённого кластера MongoDB, не локальный `mongod`. Без `MONGODB_URI` API поднимается, а вход и спин отвечают 503. Если кластер недоступен при старте, API повторяет подключение.
+
+Адрес в sitemap, robots и canonical берётся из `SITE_ORIGIN` или из `CLIENT_ORIGIN` в `server/.env`. Скрипт выполняется перед `npm start` и `npm run build` в `client`.
+
+Проверка отдачи слота: `npm run rtp --prefix server`.

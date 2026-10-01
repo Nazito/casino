@@ -1,4 +1,5 @@
 import mongoose, { InferSchemaType } from 'mongoose';
+import { Ledger } from './ledger.js';
 
 const spinSchema = new mongoose.Schema(
   {
@@ -57,30 +58,104 @@ export interface SpinRecord {
   createdAt: Date;
 }
 
+export async function openAccount(fields: { displayName: string; loginKey: string; passwordHash: string }) {
+  return inTransaction(async (session) => {
+    const [user] = await User.create([{ ...fields, balance: STARTING_BALANCE, spins: [] }], { session });
+    if (!user) {
+      throw new Error('account was not created');
+    }
+    await Ledger.create(
+      [
+        {
+          userId: user._id,
+          type: 'start',
+          delta: STARTING_BALANCE,
+          balanceAfter: user.balance,
+          createdAt: new Date(),
+        },
+      ],
+      { session },
+    );
+    return user;
+  });
+}
+
 export async function claimDaily(userId: string, now = new Date()) {
-  return User.findOneAndUpdate(
-    {
-      _id: userId,
-      balance: { $lt: MIN_STAKE },
-      lastDailyKey: { $ne: kyivDay(now) },
-    },
-    { $inc: { balance: DAILY_GRANT }, $set: { lastDailyKey: kyivDay(now) } },
-    { new: true },
-  );
+  return inTransaction(async (session) => {
+    const updated = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        balance: { $lt: MIN_STAKE },
+        lastDailyKey: { $ne: kyivDay(now) },
+      },
+      { $inc: { balance: DAILY_GRANT }, $set: { lastDailyKey: kyivDay(now) } },
+      { new: true, session },
+    );
+    if (!updated) {
+      return null;
+    }
+    await Ledger.create(
+      [
+        {
+          userId: updated._id,
+          type: 'daily',
+          delta: DAILY_GRANT,
+          balanceAfter: updated.balance,
+          createdAt: new Date(),
+        },
+      ],
+      { session },
+    );
+    return updated;
+  });
 }
 
 export async function settleSpin(userId: string, spin: SpinRecord) {
-  return User.findOneAndUpdate(
-    { _id: userId, balance: { $gte: spin.stake } },
-    {
-      $inc: { balance: spin.win - spin.stake },
-      $push: {
-        spins: {
-          $each: [spin],
-          $slice: -20,
+  return inTransaction(async (session) => {
+    const updated = await User.findOneAndUpdate(
+      { _id: userId, balance: { $gte: spin.stake } },
+      {
+        $inc: { balance: spin.win - spin.stake },
+        $push: {
+          spins: {
+            $each: [spin],
+            $slice: -20,
+          },
         },
       },
-    },
-    { new: true },
-  );
+      { new: true, session },
+    );
+    if (!updated) {
+      return null;
+    }
+    await Ledger.create(
+      [
+        {
+          userId: updated._id,
+          type: 'spin',
+          delta: spin.win - spin.stake,
+          balanceAfter: updated.balance,
+          stake: spin.stake,
+          win: spin.win,
+          reels: spin.reels,
+          createdAt: spin.createdAt,
+        },
+      ],
+      { session },
+    );
+    return updated;
+  });
+}
+
+async function inTransaction<T>(work: (session: mongoose.ClientSession) => Promise<T>): Promise<T> {
+  const session = await mongoose.startSession();
+  try {
+    let result!: T;
+    await session.withTransaction(async () => {
+      result = await work(session);
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }

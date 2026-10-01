@@ -36,8 +36,15 @@ button.link {
   padding: 2px 8px;
 }
 
+.disclaimer,
 .hint {
   color: #a6adbd;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .reels {

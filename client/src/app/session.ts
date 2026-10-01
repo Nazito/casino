@@ -24,7 +24,7 @@ export class Session {
 
   register(username: string, password: string): Observable<Player> {
     return this.http
-      .post<Player>('/api/auth/register', { username, password })
+      .post<Player>('/api/auth/register', { username, password, adult: true })
       .pipe(tap((player) => this.player.set(player)));
   }
 

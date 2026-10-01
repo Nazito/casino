@@ -1,5 +1,6 @@
 @if (game) {
   <h1>{{ game.title }}</h1>
+  <p class="disclaimer">Коины не имеют денежной ценности и не обмениваются на деньги.</p>
 
   @if (!ready()) {
     <p>Загрузка…</p>
@@ -11,7 +12,7 @@
       </button>
     </div>
     <form (submit)="submitAuth($event)">
-      <p>Аккаунт для игры на развлекательные коины. Денег и вывода здесь нет.</p>
+      <p>Аккаунт для игры на развлекательные коины. Денег здесь нет.</p>
       <label>
         Логин
         <input
@@ -35,13 +36,20 @@
           [disabled]="busy()"
         />
       </label>
+      @if (mode() === 'register') {
+        <label class="check">
+          <input name="accept" type="checkbox" required [disabled]="busy()" />
+          Мне есть 18 лет.
+        </label>
+        <p class="hint">
+          Логин 3–24 символа: буквы, цифры, «_» и «-». Пароль от 8 символов. Регистрация означает
+          принятие <a routerLink="/terms">соглашения</a> и <a routerLink="/privacy">политики конфиденциальности</a>.
+        </p>
+      }
       <button type="submit" [disabled]="busy()">
         {{ mode() === 'register' ? 'Создать аккаунт' : 'Войти' }}
       </button>
     </form>
-    @if (mode() === 'register') {
-      <p class="hint">Логин 3–24 символа: буквы, цифры, «_» и «-». Пароль от 8 символов.</p>
-    }
   } @else {
     <p class="balance">
       {{ player()!.displayName }} · {{ player()!.balance }} коинов
@@ -72,7 +80,7 @@
       <h2>Последние спины</h2>
       <ul class="history">
         @for (spin of player()!.spins.slice(0, 8); track $index) {
-          <li>{{ line(spin.reels) }} · ставка {{ spin.stake }} · выигрыш {{ spin.win }}</li>
+          <li>{{ line(spin.reels) }} · ставка {{ spin.stake }} · {{ spinChange(spin) }}</li>
         }
       </ul>
     }

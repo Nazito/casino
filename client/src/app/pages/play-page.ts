@@ -141,7 +141,7 @@ export class PlayPage {
       next: (result) => {
         this.stopFlicker();
         this.reels.set(result.reels);
-        this.outcome.set(result.win > 0 ? `Выигрыш ${result.win}` : 'Мимо');
+        this.outcome.set(this.outcomeText(result.win, result.stake));
         this.spinning.set(false);
       },
       error: (error: unknown) => {
@@ -150,6 +150,21 @@ export class PlayPage {
         this.error.set(this.message(error));
       },
     }));
+  }
+
+  protected spinChange(spin: { stake: number; win: number }): string {
+    return this.outcomeText(spin.win, spin.stake);
+  }
+
+  private outcomeText(win: number, stake: number): string {
+    const net = win - stake;
+    if (net > 0) {
+      return `Начислено ${net} коинов`;
+    }
+    if (net === 0) {
+      return 'Ставка вернулась';
+    }
+    return 'Мимо';
   }
 
   private track(subscription: Subscription): void {
@@ -174,12 +189,18 @@ export class PlayPage {
         return 'Логин: 3–24 символа, буквы, цифры, «_» и «-».';
       case 'invalid_password':
         return 'Пароль должен быть от 8 до 128 символов.';
+      case 'age_required':
+        return 'Регистрация доступна с 18 лет.';
       case 'username_taken':
         return 'Такой логин уже занят.';
       case 'invalid_credentials':
         return 'Неверный логин или пароль.';
       case 'too_many_attempts':
         return 'Слишком много неудачных попыток. Попробуйте через 15 минут.';
+      case 'slow_down':
+        return 'Слишком частые спины. Подождите минуту.';
+      case 'bad_origin':
+        return 'Запрос отклонён.';
       case 'invalid_stake':
         return 'Такая ставка недоступна.';
       case 'daily_not_needed':

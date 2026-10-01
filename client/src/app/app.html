@@ -9,4 +9,26 @@
   <main>
     <router-outlet />
   </main>
+  <footer>
+    <p>Коины не имеют денежной ценности.</p>
+    <nav>
+      <a routerLink="/rules">Правила</a>
+      <a routerLink="/terms">Соглашение</a>
+      <a routerLink="/privacy">Конфиденциальность</a>
+    </nav>
+  </footer>
 </div>
+
+@if (ageReady() && !ageOk()) {
+  <div class="age-gate">
+    <section>
+      <h2>Только 18+</h2>
+      <p>Сайт с развлекательными слотами. Денежной ценности у коинов нет.</p>
+      @if (ageBlocked()) {
+        <p>Этот сайт только для людей старше 18 лет.</p>
+      }
+      <button type="button" (click)="confirmAge()">Мне есть 18</button>
+      <button type="button" (click)="declineAge()">Мне нет 18</button>
+    </section>
+  </div>
+}
