@@ -14,6 +14,7 @@ const runningAlone = isMainModule(import.meta.url) || !!process.env['pm_id'];
 const app = express();
 const angularApp = new AngularNodeAppEngine({
   trustProxyHeaders: process.env['NODE_ENV'] === 'production',
+  allowedHosts: allowedHosts(),
 });
 
 let closeDatabase: (() => Promise<void>) | undefined;
@@ -67,3 +68,18 @@ if (runningAlone && closeDatabase) {
 }
 
 export const reqHandler = createNodeRequestHandler(app);
+
+function allowedHosts(): string[] | undefined {
+  const hosts = new Set<string>();
+  for (const item of (process.env['NG_ALLOWED_HOSTS'] ?? '').split(',')) {
+    const host = item.trim();
+    if (host) {
+      hosts.add(host);
+    }
+  }
+  const renderHost = process.env['RENDER_EXTERNAL_HOSTNAME']?.trim();
+  if (renderHost) {
+    hosts.add(renderHost);
+  }
+  return hosts.size > 0 ? [...hosts] : undefined;
+}
