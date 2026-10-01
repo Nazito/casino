@@ -102,6 +102,7 @@ export class PlayPage {
 
   protected logout(): void {
     this.busy.set(true);
+    this.error.set('');
     this.track(this.session.logout(this.slug).subscribe({
       next: () => {
         this.busy.set(false);
@@ -165,32 +166,39 @@ export class PlayPage {
       this.reels.set([pickVisual(), pickVisual(), pickVisual()]);
     }, 90);
 
+    const startedAsGuest = !player;
     const stake = player ? this.selectedStake() : guest!.stake;
     this.track(this.session.spin(this.slug, stake).subscribe({
       next: (result) => {
         this.stopFlicker();
-        this.reels.set(result.reels);
-        this.outcome.set(this.outcomeText(result.win, result.stake));
         this.spinning.set(false);
+        if (startedAsGuest && this.player()) {
+          return;
+        }
+        this.reels.set(result.reels);
+        this.outcome.set(this.outcomeText(result.win, result.stake, 'delta' in result ? result.delta : undefined));
       },
       error: (error: unknown) => {
         this.stopFlicker();
         this.spinning.set(false);
+        if (startedAsGuest && this.player()) {
+          return;
+        }
         this.error.set(this.message(error));
       },
     }));
   }
 
-  protected spinChange(spin: { stake: number; win: number }): string {
-    return this.outcomeText(spin.win, spin.stake);
+  protected spinChange(spin: { stake: number; win: number; delta?: number }): string {
+    return this.outcomeText(spin.win, spin.stake, spin.delta);
   }
 
-  private outcomeText(win: number, stake: number): string {
-    const net = win - stake;
+  private outcomeText(win: number, stake: number, delta?: number): string {
+    const net = delta ?? win - stake;
     if (net > 0) {
       return `Начислено ${net} коинов`;
     }
-    if (net === 0) {
+    if (net === 0 && win === stake) {
       return 'Ставка вернулась';
     }
     return 'Мимо';

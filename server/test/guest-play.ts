@@ -105,7 +105,15 @@ try {
   });
   const neon = second?.games.find((game) => game.slug === 'neon-fruits');
   const other = third?.games.find((game) => game.slug === 'other');
-  const playOk = first?.games[0]?.balance === 20 && neon?.balance === 10 && other?.balance === 40;
+  const neonSpins = neon?.spins ?? [];
+  const otherSpin = other?.spins?.[0];
+  const playOk =
+    first?.games[0]?.balance === 20 &&
+    first?.games[0]?.spins?.[0]?.delta === 20 &&
+    neon?.balance === 10 &&
+    neonSpins.at(-1)?.delta === -10 &&
+    other?.balance === 40 &&
+    otherSpin?.delta === 40;
 
   const name = probeName('g');
   const user = await User.create({

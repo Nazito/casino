@@ -3,6 +3,7 @@ export interface SpinView {
   win: number;
   reels: string[];
   createdAt: string;
+  delta?: number;
 }
 
 export interface Player {
@@ -36,6 +37,7 @@ export interface GuestState {
 export interface GuestSpin extends GuestState {
   reels: string[];
   win: number;
+  delta: number;
 }
 
 export const stakes = [10, 50, 100, 500] as const;

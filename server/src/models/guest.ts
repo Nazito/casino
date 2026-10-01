@@ -14,6 +14,7 @@ const spinSchema = new mongoose.Schema(
     stake: { type: Number, required: true },
     win: { type: Number, required: true },
     reels: { type: [String], required: true },
+    delta: { type: Number, required: true },
     createdAt: { type: Date, required: true },
   },
   { _id: false },
@@ -50,6 +51,7 @@ export interface GuestSpinRecord {
   win: number;
   reels: string[];
   createdAt: Date;
+  delta?: number;
 }
 
 type GuestGame = {
@@ -125,11 +127,12 @@ export async function settleGuestSpin(guestId: string, slug: string, spin: Guest
       spinsLeft: { $gte: 1 },
     };
 
+    const fromBalance = recorded(spin, spin.win - spin.stake);
     const funded = await Guest.findOneAndUpdate(
       { ...open, games: { $elemMatch: { slug, balance: { $gte: spin.stake } } } },
       {
-        $inc: { spinsLeft: -1, 'games.$.balance': spin.win - spin.stake },
-        $push: { 'games.$.spins': { $each: [spin], $slice: -20 } },
+        $inc: { spinsLeft: -1, 'games.$.balance': fromBalance.delta },
+        $push: { 'games.$.spins': { $each: [fromBalance], $slice: -20 } },
       },
       { new: true, session },
     );
@@ -137,11 +140,12 @@ export async function settleGuestSpin(guestId: string, slug: string, spin: Guest
       return funded;
     }
 
+    const fromEmpty = recorded(spin, spin.win);
     const opened = await Guest.findOneAndUpdate(
       { ...open, games: { $not: { $elemMatch: { slug } } } },
       {
         $inc: { spinsLeft: -1 },
-        $push: { games: { slug, balance: spin.win, spins: [spin] } },
+        $push: { games: { slug, balance: fromEmpty.delta, spins: [fromEmpty] } },
       },
       { new: true, session },
     );
@@ -152,8 +156,8 @@ export async function settleGuestSpin(guestId: string, slug: string, spin: Guest
     return Guest.findOneAndUpdate(
       { ...open, games: { $elemMatch: { slug, balance: 0 } } },
       {
-        $inc: { spinsLeft: -1, 'games.$.balance': spin.win },
-        $push: { 'games.$.spins': { $each: [spin], $slice: -20 } },
+        $inc: { spinsLeft: -1, 'games.$.balance': fromEmpty.delta },
+        $push: { 'games.$.spins': { $each: [fromEmpty], $slice: -20 } },
       },
       { new: true, session },
     );
@@ -209,6 +213,10 @@ export function setGuestCookie(res: Response, token: string): void {
 
 export function clearGuestCookie(res: Response): void {
   res.clearCookie(COOKIE, cookieOptions());
+}
+
+function recorded(spin: GuestSpinRecord, delta: number): GuestSpinRecord {
+  return { stake: spin.stake, win: spin.win, reels: spin.reels, createdAt: spin.createdAt, delta };
 }
 
 function guestQuotaKey(ipKey: string): string {

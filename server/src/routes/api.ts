@@ -294,7 +294,8 @@ api.post('/games/neon-fruits/spin', spinBurst, async (req, res) => {
     return;
   }
 
-  res.json({ reels, win, ...publicGuest(updated, 'neon-fruits') });
+  const view = publicGuest(updated, 'neon-fruits');
+  res.json({ reels, win, delta: view.spins[0]?.delta ?? 0, ...view });
 });
 
 async function currentUser(

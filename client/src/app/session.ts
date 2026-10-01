@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, map, of, switchMap, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, switchMap, tap, throwError } from 'rxjs';
 import { GuestSpin, GuestState, Player, SpinResponse } from './player';
 
 @Injectable({ providedIn: 'root' })
@@ -47,10 +47,10 @@ export class Session {
       .pipe(tap((player) => this.rememberPlayer(player)));
   }
 
-  logout(slug: string): Observable<GuestState | null> {
+  logout(slug: string): Observable<GuestState> {
     return this.http.post<void>('/api/auth/logout', {}).pipe(
       tap(() => this.player.set(null)),
-      switchMap(() => this.openGuest(slug).pipe(catchError(() => of(null)))),
+      switchMap(() => this.openGuest(slug)),
     );
   }
 
@@ -64,8 +64,9 @@ export class Session {
     return this.http.post<SpinResponse | GuestSpin>(`/api/games/${encodeURIComponent(slug)}/spin`, { stake }).pipe(
       tap((result) => {
         if (isGuestSpin(result)) {
-          this.guest.set(result);
-          this.player.set(null);
+          if (!this.player()) {
+            this.guest.set(result);
+          }
           return;
         }
         this.rememberPlayer(result);
