@@ -13,7 +13,7 @@
 
 ## Сервер
 
-### Конвейер запроса (`server/src/index.ts`)
+### Конвейер запроса (`server/src/app.ts`)
 
 1. `trust proxy = 1` — доверяем одному прокси перед сервером: `req.ip` — адрес клиента, который этот прокси
    передал в `X-Forwarded-For`, а не адрес самого прокси.
@@ -33,7 +33,7 @@
 | `GET /api/health` | `{ ok, database }` | — |
 | `GET /api/session` | текущий игрок; если есть гостевая cookie, её коины уже сложены в баланс | `401 unauthorized` |
 | `POST /api/guest` | `{ slug }` → гостевая сессия: остаток спинов и коины этой игры | `too_many_guests`, `already_signed_in` |
-| `POST /api/auth/register` | `{ username, password, adult: true }` → игрок, сессия, гостевые коины | `invalid_username`, `invalid_password`, `age_required`, `username_taken`, `too_many_attempts` |
+| `POST /api/auth/register` | `{ username, password, adult: true }` → игрок, сессия, гостевые коины | `invalid_username`, `invalid_password`, `age_required`, `username_reserved`, `username_taken`, `too_many_attempts` |
 | `POST /api/auth/login` | `{ username, password }` → игрок, сессия, гостевые коины | `invalid_credentials`, `too_many_attempts` |
 | `POST /api/auth/logout` | завершает сессию | — |
 | `POST /api/wallet/daily` | бонус при балансе < 10 | `daily_not_needed`, `daily_already_claimed` |
@@ -120,14 +120,14 @@
 
 ## Проверки и тесты
 
-- CI (`.github/workflows/ci.yml`) на каждый PR и push в `main`: сборка, `rtp`, `test:spins`, `test:daily`.
-- Тесты с базой — скрипты на `tsx` в `server/test/`, включая `test:guest`. Имена тестовых аккаунтов —
-  `probe_<вид>_<id запуска>` (`probe-name.ts`), каждый запуск удаляет только свои.
+- CI (`.github/workflows/ci.yml`) на каждый PR и push в `main`: сборка, `rtp`, `npm test` в `server`.
+  Базу CI не трогает и строку подключения не читает.
+- `npm test` — чистые функции: выплаты Neon Fruits, киевские сутки, дневной бонус, формат логина и пароля, префикс `probe_`.
+- `npm run test:db` — вручную перед мержем: параллельные спины, дневной бонус в базе, гостевые спины, HTTP регистрации и входа.
+  Имена тестовых аккаунтов — `probe_<вид>_<id запуска>` (`probe-name.ts`), каждый запуск удаляет только свои.
+- У клиента нет цели `ng test`: в `angular.json` нет test-таргета и нет `*.spec.ts`.
 
 ## Известный долг
 
-- CI запускает тесты с базой через секрет `MONGODB_URI`, то есть пишет в живую базу игроков.
-  По плану (задача 1.1) в CI должны идти только тесты без базы.
-- Нет модульных тестов на чистые функции (`payout`, `canClaimDaily`, валидация) — задача 1.2.
 - Ставки и список путей sitemap дублируются вручную.
 - Лимиты регистрации и спинов в памяти — при нескольких процессах не общие.

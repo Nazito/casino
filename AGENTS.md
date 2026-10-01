@@ -14,7 +14,8 @@ Social casino для Украины: слоты на развлекательн�
 
 | Путь | Что там |
 |---|---|
-| `server/src/index.ts` | Express: helmet, CORS, проверка Origin, подключение `/api` |
+| `server/src/app.ts` | Express: helmet, CORS, проверка Origin, подключение `/api` |
+| `server/src/index.ts` | слушает порт и подключает MongoDB |
 | `server/src/routes/api.ts` | все эндпоинты API |
 | `server/src/auth.ts` | пароли (scrypt), сессии в cookie `sid` |
 | `server/src/login-limit.ts` | лимиты входа и регистрации в MongoDB |
@@ -35,6 +36,8 @@ Node 26 (`nvm use`). Секреты — в `server/.env`, образец в `ser
 npm run dev                          # сайт :4217, API :3017
 npm run build                        # клиент и сервер
 npm run rtp --prefix server          # RTP слота, падает вне 94–96%
+npm test --prefix server             # выплаты, сутки, валидация; базы нет, это гоняет CI
+npm run test:db --prefix server      # спины, бонус, гости, HTTP входа; пишет в базу, вручную
 npm run test:spins --prefix server   # параллельные спины (пишет в базу)
 npm run test:daily --prefix server   # ежедневный бонус (пишет в базу)
 npm run test:guest --prefix server   # 50 спинов без аккаунта и сложение коинов (пишет в базу)

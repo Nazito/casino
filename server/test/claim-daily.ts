@@ -86,6 +86,23 @@ try {
   const rows = await Ledger.find({ userId: empty._id });
   const again = await claimDaily(empty._id.toString(), now);
 
+  const day = new Date('2026-01-15T12:00:00Z');
+  const later = new Date('2026-01-16T12:00:00Z');
+  const nextName = probeName('d', '_n');
+  const nextUser = await User.create({
+    displayName: nextName,
+    loginKey: nextName,
+    passwordHash: 'probe',
+    balance: 0,
+    spins: [],
+  });
+  userIds.push(nextUser._id);
+  const firstDay = await claimDaily(nextUser._id.toString(), day);
+  const sameDay = await claimDaily(nextUser._id.toString(), day);
+  await User.updateOne({ _id: nextUser._id }, { $set: { balance: 0 } });
+  const nextDay = await claimDaily(nextUser._id.toString(), later);
+  const dayOk = firstDay?.balance === DAILY_GRANT && sameDay === null && nextDay?.balance === DAILY_GRANT;
+
   const fundedOk = blocked === null && fundedFresh?.balance === MIN_STAKE && fundedRows.length === 0;
   const emptyOk =
     rejected.length === 0 &&
@@ -96,7 +113,7 @@ try {
     rows[0]?.type === 'daily' &&
     rows[0]?.delta === DAILY_GRANT &&
     rows[0]?.balanceAfter === DAILY_GRANT;
-  failed = !fundedOk || !emptyOk;
+  failed = !fundedOk || !emptyOk || !dayOk;
   if (failed) {
     console.error(
       JSON.stringify({
@@ -109,6 +126,9 @@ try {
         again: again !== null,
         ledgerRows: rows.length,
         delta: rows[0]?.delta ?? null,
+        firstDay: firstDay?.balance ?? null,
+        sameDay: sameDay !== null,
+        nextDay: nextDay?.balance ?? null,
       }),
     );
   } else {

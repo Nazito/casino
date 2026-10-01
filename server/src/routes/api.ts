@@ -6,6 +6,7 @@ import {
   burnPasswordCheck,
   endSession,
   hashPassword,
+  isProbeName,
   loginKey,
   normalizeUsername,
   readUserId,
@@ -113,6 +114,12 @@ api.post('/auth/register', registerBurst, async (req, res) => {
     return;
   }
 
+  const key = loginKey(username);
+  if (isProbeName(username) && !(await User.exists({ $or: [{ loginKey: key }, { displayName: sameName(username) }] }))) {
+    res.status(400).json({ error: 'username_reserved' });
+    return;
+  }
+
   if (!(await allowIp(req.ip))) {
     res.status(429).json({ error: 'too_many_attempts' });
     return;
@@ -122,7 +129,6 @@ api.post('/auth/register', registerBurst, async (req, res) => {
     return;
   }
 
-  const key = loginKey(username);
   if (await User.exists({ $or: [{ loginKey: key }, { displayName: sameName(username) }] })) {
     res.status(409).json({ error: 'username_taken' });
     return;

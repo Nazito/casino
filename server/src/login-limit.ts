@@ -39,6 +39,13 @@ export async function clearLoginFailures(login: string): Promise<void> {
   await AuthLimit.deleteOne({ key: `login:${login}` });
 }
 
+export async function deleteLimitKeys(keys: string[]): Promise<void> {
+  if (keys.length === 0) {
+    return;
+  }
+  await AuthLimit.deleteMany({ key: { $in: keys } });
+}
+
 async function consume(key: string, max: number, lockOnMax: boolean): Promise<'ok' | 'locked'> {
   const now = new Date();
   const nextWindow = new Date(now.getTime() + WINDOW_MS);

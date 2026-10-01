@@ -230,6 +230,8 @@ export class PlayPage {
         return 'Регистрация доступна с 18 лет.';
       case 'username_taken':
         return 'Такой логин уже занят.';
+      case 'username_reserved':
+        return 'Такое имя зарезервировано.';
       case 'invalid_credentials':
         return 'Неверный логин или пароль.';
       case 'too_many_attempts':
