@@ -9,28 +9,31 @@
 ```
 
 - В разработке два процесса: `ng serve` на :4217 проксирует `/api` на Express :3017 (`client/proxy.conf.json`).
-- Прод-деплоя ещё нет. План — один Node-процесс на одном домене (задача 2.1 в `docs/mvp-plan.md`).
+- В проде один процесс: `npm start` отдаёт страницы Angular и `/api` на `PORT`. Пререндер остаётся статикой, `/play/*` считается в браузере.
 
 ## Сервер
 
 ### Конвейер запроса (`server/src/app.ts`)
 
+В разработке это отдельный процесс API. В проде тот же роутер подключается к процессу Angular (`client/src/server.ts`).
+
 1. `trust proxy = 1` — доверяем одному прокси перед сервером: `req.ip` — адрес клиента, который этот прокси
    передал в `X-Forwarded-For`, а не адрес самого прокси.
-2. `helmet` — заголовки безопасности.
-3. `cors` — только `CLIENT_ORIGIN`, с cookie.
-4. Проверка Origin: любой запрос, кроме GET, HEAD и OPTIONS, без `Origin === CLIENT_ORIGIN` получает `403 bad_origin`.
-   Это защита от CSRF вместе с `sameSite: lax`.
+2. `helmet` — заголовки безопасности, только на `/api`.
+3. В разработке `cors` — только `CLIENT_ORIGIN`, с cookie. В проде CORS нет: сайт и API на одном домене.
+4. Проверка Origin: любой запрос, кроме GET, HEAD и OPTIONS, без подходящего `Origin` получает `403 bad_origin`.
+   В разработке подходит `CLIENT_ORIGIN`. В проде подходит и Origin самого сайта. Это защита от CSRF вместе с `sameSite: lax`.
 5. `cookie-parser`, `express.json`, роутер `/api`.
 
-Подключение к MongoDB (`db.ts`) повторяется каждые 5 секунд, пока не удастся. До подключения эндпоинты,
-которым нужна база, отвечают `503 database_unavailable`.
+Подключение к MongoDB (`db.ts`) повторяется каждые 5 секунд, пока не удастся. До подключения `GET /api/health`
+отвечает `503`. Эндпоинты, которым нужна база, отвечают `503 database_unavailable`.
+По `SIGTERM` прод-процесс перестаёт принимать запросы и закрывает MongoDB.
 
 ### API (`server/src/routes/api.ts`)
 
 | Метод и путь | Что делает | Ошибки |
 |---|---|---|
-| `GET /api/health` | `{ ok, database }` | — |
+| `GET /api/health` | `{ ok, database }`; без базы статус 503 | — |
 | `GET /api/session` | текущий игрок; если есть гостевая cookie, её коины уже сложены в баланс | `401 unauthorized` |
 | `POST /api/guest` | `{ slug }` → гостевая сессия: остаток спинов и коины этой игры | `too_many_guests`, `already_signed_in` |
 | `POST /api/auth/register` | `{ username, password, adult: true }` → игрок, сессия, гостевые коины | `invalid_username`, `invalid_password`, `age_required`, `username_reserved`, `username_taken`, `too_many_attempts` |
@@ -111,10 +114,11 @@
 
 | Переменная | Зачем |
 |---|---|
-| `PORT` | порт API, по умолчанию 3017 |
+| `PORT` | порт процесса. В разработке это API, по умолчанию 3017. В проде на этом порту и сайт, и API |
 | `MONGODB_URI` | кластер Atlas, база одна для прода и разработки |
-| `CLIENT_ORIGIN` | разрешённый Origin для CORS и проверки POST; адрес сайта по умолчанию |
+| `CLIENT_ORIGIN` | в разработке: разрешённый Origin для CORS и проверки POST. В проде дополнительно принимается Origin самого сайта |
 | `SITE_ORIGIN` | адрес сайта для sitemap и canonical при сборке (если отличается) |
+| `NG_ALLOWED_HOSTS` | дополнительные имена хоста для прод-сервера, через запятую. `localhost` и `127.0.0.1` уже разрешены сборкой |
 
 Запланированы: `SUPPORT_EMAIL`, `SMTP_USER`, `SMTP_PASS` (задачи 3.6, 3.7).
 
