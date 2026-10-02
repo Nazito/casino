@@ -27,6 +27,7 @@ Social casino для Украины: слоты на развлекательн�
 | `client/src/app/pages/` | страницы Angular |
 | `client/src/app/games.ts` | каталог игр для публичных страниц |
 | `client/scripts/write-site.mjs` | адрес сайта, sitemap и robots при сборке |
+| `render.yaml` | Blueprint Render: сборка, старт, health-check, регион Frankfurt |
 | `.agents/skills/`, `.cursor/skills/` | скилы: `tune-rtp`, `angular-developer`, `mongodb-connection`, `find-skills` |
 
 ## Команды

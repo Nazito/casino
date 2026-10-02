@@ -1,0 +1,24 @@
+services:
+  - type: web
+    runtime: node
+    name: social-casino
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm ci --prefix client && npm ci --prefix server && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 26.5.0
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: SITE_ORIGIN
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: NG_ALLOWED_HOSTS
+        sync: false

@@ -29,6 +29,10 @@ function readOrigin() {
     return process.env.SITE_ORIGIN;
   }
 
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL;
+  }
+
   try {
     const env = readFileSync(join(root, '../server/.env'), 'utf8');
     const line = env.split('\n').find((item) => item.startsWith('CLIENT_ORIGIN='));

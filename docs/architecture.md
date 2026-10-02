@@ -10,6 +10,7 @@
 
 - В разработке два процесса: `ng serve` на :4217 проксирует `/api` на Express :3017 (`client/proxy.conf.json`).
 - В проде один процесс: `npm start` отдаёт страницы Angular и `/api` на `PORT`. Пререндер остаётся статикой, `/play/*` считается в браузере.
+- Деплой: Render (Frankfurt), Blueprint `render.yaml`, автодеплой с `main`, health-check `/api/health`.
 
 ## Сервер
 
@@ -117,8 +118,8 @@
 | `PORT` | порт процесса. В разработке это API, по умолчанию 3017. В проде на этом порту и сайт, и API |
 | `MONGODB_URI` | кластер Atlas, база одна для прода и разработки |
 | `CLIENT_ORIGIN` | в разработке: разрешённый Origin для CORS и проверки POST. В проде дополнительно принимается Origin самого сайта |
-| `SITE_ORIGIN` | адрес сайта для sitemap и canonical при сборке (если отличается) |
-| `NG_ALLOWED_HOSTS` | дополнительные имена хоста для прод-сервера, через запятую. `localhost` и `127.0.0.1` уже разрешены сборкой |
+| `SITE_ORIGIN` | адрес сайта для sitemap и canonical при сборке (если отличается). На Render при сборке можно опереться на `RENDER_EXTERNAL_URL` |
+| `NG_ALLOWED_HOSTS` | дополнительные имена хоста для прод-сервера, через запятую. `localhost` и `127.0.0.1` уже разрешены сборкой. На Render к списку добавляется `RENDER_EXTERNAL_HOSTNAME` |
 
 Запланированы: `SUPPORT_EMAIL`, `SMTP_USER`, `SMTP_PASS` (задачи 3.6, 3.7).
 
